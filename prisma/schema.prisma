@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  avatar       String?
+  street       String?
+  city         String?
+  state        String?
+  zip          String?
+  orderHistory Json?
+  totalSpent   Float?   @default(0)
+  role         String?
+  createdBy    Json?    // { uid: string, name: string }
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+  orders       Order[]
+
+  @@map("customers")
+}
+
+model Order {
+  id             String    @id @default(cuid())
+  customerName   String
+  contactNumber  String?
+  address        String?
+  orderDate      DateTime?
+  itemName       String    // Legacy field for display
+  items          Json?     // New field for detailed inventory tracking
+  quantity       Int
+  price          Float
+  shippingFee    Float
+  totalAmount    Float
+  paymentMethod  String?
+  paymentStatus  String?
+  shippingStatus String?
+  batchId        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  customerId     String
+  customerEmail  String?
+  courierName    String?
+  trackingNumber String?
+  remarks        String?
+  rushShip       Boolean   @default(false)
+  createdBy      Json?
+  batch          Batch?    @relation(fields: [batchId], references: [id])
+  customer       Customer  @relation(fields: [customerId], references: [id])
+
+  @@index([batchId], map: "orders_batchId_fkey")
+  @@index([customerId], map: "orders_customerId_fkey")
+  @@map("orders")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   // 'low_stock' | 'out_of_stock' | 'new_order'
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notifications")
+}
+
+
+model Batch {
+  id           String    @id @default(cuid())
+  batchName    String
+  deliveryDate DateTime
+  cutoffDate   DateTime
+  status       String
+  totalOrders  Int?
+  totalSales   Float?
+  createdBy    Json?     // { uid: string, name: string }
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  orders       Order[]
+  products     Product[]
+
+  @@map("batches")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  sku         String   @unique
+  description String?
+  branch1     Int      @default(0)
+  branch2     Int      @default(0)
+  warehouse   Int      @default(0)
+  alertStock  Int      @default(0)
+  cost        Float
+  retailPrice Float?
+  images      Json?
+  batchId     String?
+  createdBy   Json?    // { uid: string, name: string }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  batch       Batch?   @relation(fields: [batchId], references: [id])
+
+  @@index([batchId], map: "products_batchId_fkey")
+  @@map("products")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  password    String
+  role        String?
+  roleId      String?
+  branchId    String?
+  permissions Json?    @default("{\"dashboard\":true,\"orders\":true,\"batches\":true,\"inventory\":true,\"customers\":true,\"reports\":true,\"users\":false,\"settings\":false}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  role_rel    Role?    @relation("UserRole", fields: [roleId], references: [id])
+
+  @@index([branchId], map: "users_branchId_fkey")
+  @@index([roleId], map: "users_roleId_fkey")
+  @@map("users")
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  users     User[]
+
+  @@map("branches")
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  users     User[]   @relation("UserRole")
+
+  @@map("roles")
+}
+
+model ArchiveData {
+  id        String   @id @default(cuid())
+  tableName String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("archive_data")
+}
+
+model Station {
+  id            String   @id @default(cuid())
+  name          String
+  location      String
+  type          String   // "courier" or "pickup"
+  contactNumber String?
+  latitude      Float?
+  longitude     Float?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@map("stations")
+}
+
+model DatabaseOperation {
+  id        String   @id @default(cuid())
+  type      String   // 'IMPORT' or 'EXPORT'
+  fileName  String
+  fileSize  String
+  status    String   // 'SUCCESS', 'FAILED', 'PENDING'
+  details   Json?    // For import: records count, etc. For export: tables included, format
+  createdAt DateTime @default(now())
+
+  @@map("database_operations")
+}
+
+model SalesLog {
+  id             String   @id @default(cuid())
+  orderId        String?
+  action         String   // 'ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_CANCELLED', 'PAYMENT_UPDATED', etc.
+  description    String?
+  performedBy    Json?    // { uid: string, name: string, role: string }
+  customerName   String?
+  totalAmount    Float?
+  previousData   Json?    // Store previous state for updates
+  newData        Json?    // Store new state for updates
+  createdAt      DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("sales_logs")
+}
+
+model AdminLog {
+  id           String   @id @default(cuid())
+  action       String   // 'USER_CREATED', 'USER_UPDATED', 'USER_DELETED', 'SETTINGS_CHANGED', 'DATABASE_EXPORT', etc.
+  module       String?  // 'USERS', 'SETTINGS', 'DATABASE', 'INVENTORY', 'CUSTOMERS', etc.
+  description  String?
+  performedBy  Json?    // { uid: string, name: string, role: string }
+  targetId     String?  // ID of the affected resource
+  targetType   String?  // Type of the affected resource (e.g., 'USER', 'PRODUCT', 'BATCH')
+  previousData Json?    // Store previous state for updates
+  newData      Json?    // Store new state for updates
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([action])
+  @@index([module])
+  @@index([createdAt])
+  @@map("admin_logs")
+}

@@ -1,0 +1,629 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Customer, Order, PaymentStatus, ShippingStatus, PaymentMethod, Batch, OrderRemark, Product } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown, Check, Copy, Package, Trash2, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SelectProductDialog } from "./select-product-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Image as ImageIcon } from "lucide-react";
+import { createOrder } from "../actions";
+import { useRouter } from "next/navigation";
+import { createCustomer } from "../../customers/actions";
+
+interface CreateOrderDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  customers: Customer[];
+  products: Product[];
+}
+
+const paymentStatuses: PaymentStatus[] = ["Hold", "Paid", "Unpaid", "PAID PENDING"];
+const shippingStatuses: ShippingStatus[] = ["Pending", "Ready", "Shipped", "Delivered", "Cancelled", "Claimed"];
+const paymentMethods: PaymentMethod[] = ["COD", "GCash", "Bank Transfer"];
+const remarksOptions: OrderRemark[] = ["PLUS Branch 1", "PLUS Branch 2", "PLUS Warehouse"];
+
+
+export function CreateOrderDialog({
+  isOpen,
+  onClose,
+  customers,
+  products,
+}: CreateOrderDialogProps) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [contactNumber, setContactNumber] = useState("");
+  const [address, setAddress] = useState("");
+
+  // Multiple Items State
+  const [selectedItems, setSelectedItems] = useState<{ product: Product; quantity: number | string }[]>([]);
+
+  const [shippingFee, setShippingFee] = useState("0");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("Unpaid");
+  const [shippingStatus, setShippingStatus] = useState<ShippingStatus>("Pending");
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const [courierName, setCourierName] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [remarks, setRemarks] = useState<OrderRemark>('');
+  const [rushShip, setRushShip] = useState(false);
+  const [isPickup, setIsPickup] = useState(false);
+
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [lastCreatedOrder, setLastCreatedOrder] = useState<Order | null>(null);
+  const [isProductSelectOpen, setProductSelectOpen] = useState(false);
+
+  useEffect(() => {
+    const itemsTotal = selectedItems.reduce((sum, item) => sum + (item.product.retailPrice * (typeof item.quantity === 'string' ? 0 : item.quantity)), 0);
+    const sf = parseFloat(shippingFee) || 0;
+    setTotalAmount(itemsTotal + sf);
+  }, [selectedItems, shippingFee]);
+
+  const resetForm = () => {
+    setCustomerName("");
+    setContactNumber("");
+    setAddress("");
+    setSelectedItems([]);
+    setShippingFee("0");
+    setPaymentMethod("COD");
+    setPaymentStatus("Unpaid");
+    setShippingStatus("Pending");
+    setBatchId(null);
+    setTotalAmount(0);
+    setCourierName("");
+    setTrackingNumber("");
+    setRemarks('');
+    setRushShip(false);
+    setIsPickup(false);
+    setLastCreatedOrder(null);
+    setIsSubmitting(false);
+  };
+
+  const copyInvoice = () => {
+    if (!lastCreatedOrder) return;
+    const itemsList = selectedItems.map(item => `- ${item.product.name} (x${item.quantity})`).join('\n');
+    const invoiceText = `
+      Order ID: ${lastCreatedOrder.id.substring(0, 7)}
+      Customer: ${lastCreatedOrder.customerName}
+      Items:
+      ${itemsList}
+      Total: PHP ${lastCreatedOrder.totalAmount.toFixed(2)}
+      Payment: ${lastCreatedOrder.paymentMethod}
+      Status: ${lastCreatedOrder.paymentStatus}
+    `;
+    navigator.clipboard.writeText(invoiceText.trim());
+  };
+
+  const handlePrintReceipt = () => {
+    if (!lastCreatedOrder) return;
+
+    // Simple print function using a hidden iframe or new window
+    // For now, let's use window.print logic or a specific print style
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const itemsHtml = selectedItems.map(item => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.product.name}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">₱${item.product.retailPrice.toFixed(2)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">₱${(item.product.retailPrice * (typeof item.quantity === 'string' ? 0 : item.quantity)).toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Receipt - ${lastCreatedOrder.id.substring(0, 7)}</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .details { margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            .total { text-align: right; margin-top: 20px; font-weight: bold; font-size: 1.2em; }
+            @media print {
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>ThriftersFind</h1>
+            <p>Official Receipt</p>
+          </div>
+          <div class="details">
+            <p><strong>Order ID:</strong> ${lastCreatedOrder.id}</p>
+            <p><strong>Date:</strong> ${new Date(lastCreatedOrder.createdAt).toLocaleString()}</p>
+            <p><strong>Customer:</strong> ${lastCreatedOrder.customerName}</p>
+            <p><strong>Address:</strong> ${lastCreatedOrder.address || 'N/A'}</p>
+            <p><strong>Contact:</strong> ${lastCreatedOrder.contactNumber || 'N/A'}</p>
+          </div>
+          <table>
+            <thead>
+              <tr style="background: #f4f4f4;">
+                <th style="padding: 8px; text-align: left;">Item</th>
+                <th style="padding: 8px; text-align: center;">Qty</th>
+                <th style="padding: 8px; text-align: right;">Price</th>
+                <th style="padding: 8px; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          <div class="total">
+            <p>Shipping Fee: ₱${lastCreatedOrder.shippingFee.toFixed(2)}</p>
+            <p>Total Amount: ₱${lastCreatedOrder.totalAmount.toFixed(2)}</p>
+          </div>
+          <div style="margin-top: 40px; text-align: center;">
+            <p>Thank you for your purchase!</p>
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+
+  const handleSave = async () => {
+    if (!customerName || selectedItems.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please select a customer and at least one item.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const existingCustomer = customers.find(c => c.name.toLowerCase() === customerName.toLowerCase());
+      let finalCustomerId = existingCustomer?.id;
+      let finalCustomerEmail = existingCustomer?.email || `${customerName.split(' ').join('.').toLowerCase()}@example.com`;
+
+      if (!existingCustomer) {
+        toast({
+          title: "Creating New Customer",
+          description: `Adding ${customerName} to the database...`,
+        });
+
+        const newCustomer = await createCustomer({
+          name: customerName,
+          email: finalCustomerEmail,
+          phone: contactNumber,
+          avatar: "",
+          address: {
+            street: address.split(',')[0] || "",
+            city: address.split(',')[1]?.trim() || "",
+            state: address.split(',')[2]?.trim() || "",
+            zip: "",
+          },
+          orderHistory: [],
+          totalSpent: 0,
+        });
+        finalCustomerId = newCustomer.id;
+      }
+
+      // Combine item names for the single-item record in mock/legacy schema
+      const combinedItemName = selectedItems.map(item => `${item.product.name} (x${item.quantity})`).join(', ');
+
+      const orderData: Omit<Order, 'id' | 'createdAt'> = {
+        customerId: finalCustomerId!,
+        customerName: customerName,
+        customerEmail: finalCustomerEmail,
+        contactNumber: contactNumber || (existingCustomer ? existingCustomer.phone : ''),
+        address: address || (existingCustomer ? `${existingCustomer.address.street}, ${existingCustomer.address.city}`.trim() : ''),
+        orderDate: new Date().toISOString().split('T')[0],
+        itemName: combinedItemName,
+        quantity: selectedItems.reduce((sum, item) => sum + (typeof item.quantity === 'string' ? 0 : item.quantity), 0),
+        price: selectedItems[0]?.product.retailPrice || 0, // Mocking price as first item's price
+        shippingFee: parseFloat(shippingFee) || 0,
+        totalAmount: totalAmount || 0,
+        paymentMethod,
+        paymentStatus: batchId === 'hold' ? 'Hold' : paymentStatus,
+        shippingStatus,
+        batchId: (batchId === 'hold' || batchId === 'none' || !batchId) ? null : batchId,
+        courierName,
+        trackingNumber,
+        remarks,
+        rushShip,
+        createdBy: { uid: 'user-id', name: 'Current User' }, // Replace with real user info if available
+        items: selectedItems.map(item => ({
+          product: { id: item.product.id, name: item.product.name },
+          quantity: typeof item.quantity === 'string' ? 0 : item.quantity
+        })),
+      };
+
+
+      const result = await createOrder(orderData);
+      setLastCreatedOrder(result);
+      toast({
+        title: "Order Created",
+        description: `A new order has been successfully created.`,
+      });
+      router.refresh();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error Creating Order",
+        description: error instanceof Error ? error.message : "Something went wrong.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  }
+
+  const handleCustomerSelect = (customer: Customer) => {
+    setCustomerName(customer.name);
+    setContactNumber(customer.phone);
+    setAddress([customer.address.street, customer.address.city, customer.address.state].filter(Boolean).join(', '));
+    setComboboxOpen(false);
+  }
+
+  const handleProductSelect = (newSelectedItems: { product: Product; quantity: number | string }[]) => {
+    setSelectedItems(prev => {
+      const updated = [...prev];
+      newSelectedItems.forEach(newItem => {
+        const existingIndex = updated.findIndex(item => item.product.id === newItem.product.id);
+        if (existingIndex > -1) {
+          const currentQty = typeof updated[existingIndex].quantity === 'string' ? 0 : updated[existingIndex].quantity;
+          const newQty = typeof newItem.quantity === 'string' ? 0 : newItem.quantity;
+          updated[existingIndex].quantity = currentQty + newQty;
+        } else {
+          updated.push(newItem);
+        }
+      });
+      return updated;
+    });
+    setProductSelectOpen(false);
+  };
+
+  const removeItem = (productId: string) => {
+    setSelectedItems(prev => prev.filter(item => item.product.id !== productId));
+  };
+
+  const updateItemQuantity = (productId: string, quantity: string) => {
+    setSelectedItems(prev => prev.map(item =>
+      item.product.id === productId ? { ...item, quantity: quantity === "" ? "" : Math.max(0, parseInt(quantity) || 0) } : item
+    ));
+  };
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="text-2xl font-bold border-b pb-4">{lastCreatedOrder ? 'Order Created Successfully' : 'Create New Order'}</DialogTitle>
+            {!lastCreatedOrder && <DialogDescription className="pt-2">
+              Fill in the details below to create a new order.
+            </DialogDescription>}
+          </DialogHeader>
+
+          {lastCreatedOrder ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-6 py-12 px-6">
+              <div className="bg-green-100 dark:bg-green-900/30 p-4 rounded-full">
+                <Check className="h-12 w-12 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="text-center space-y-2">
+                <p className="text-lg font-medium">Order for {lastCreatedOrder.customerName} has been created.</p>
+                <div className="flex flex-col gap-2 w-full">
+                  <Button onClick={handlePrintReceipt} size="lg" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                    <Package className="mr-2 h-4 w-4" />
+                    Print Receipt
+                  </Button>
+                  <Button onClick={copyInvoice} variant="outline" size="lg" className="w-full">
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Invoice Details
+                  </Button>
+                  <Button onClick={handleClose} variant="secondary" size="lg" className="w-full">
+                    OK / Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-6">
+                {/* Customer Information Section */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pb-2 border-b">Customer Information</h3>
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="customerName">Customer Name</Label>
+                      <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={comboboxOpen}
+                            className="w-full justify-between"
+                          >
+                            {customerName || "Select or create customer..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search or type new customer..."
+                              value={customerName}
+                              onValueChange={setCustomerName}
+                            />
+                            <CommandList>
+                              <CommandEmpty>No customer found. Type name to create.</CommandEmpty>
+                              <CommandGroup>
+                                {customers.map((customer) => (
+                                  <CommandItem
+                                    key={customer.id}
+                                    value={customer.name}
+                                    onSelect={() => handleCustomerSelect(customer)}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        customerName.toLowerCase() === customer.name.toLowerCase() ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {customer.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="contactNumber">Contact No.</Label>
+                        <Input id="contactNumber" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="09XX-XXX-XXXX" />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="address">Address</Label>
+                        <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, City, State" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Item Purchases Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Item Purchases</h3>
+                    <Button variant="outline" size="sm" onClick={() => setProductSelectOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Item
+                    </Button>
+                  </div>
+
+                  {selectedItems.length === 0 ? (
+                    <div className="border-2 border-dashed rounded-lg p-8 text-center bg-muted/50">
+                      <Package className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No items added to this order yet.</p>
+                      <Button variant="link" className="text-xs" onClick={() => setProductSelectOpen(true)}>Choose from products</Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {selectedItems.map((item) => (
+                        <div key={item.product.id} className="flex items-center gap-4 p-3 bg-card border rounded-lg shadow-sm">
+                          <Avatar className="h-12 w-12 rounded-md">
+                            <AvatarImage src={item.product.images?.[0] as string} alt={item.product.name} />
+                            <AvatarFallback className="rounded-md bg-muted">
+                              <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate">{item.product.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-muted-foreground">SKU: {item.product.sku}</span>
+                              <span className="text-xs font-medium text-primary">₱{item.product.retailPrice.toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={item.quantity}
+                              onChange={(e) => updateItemQuantity(item.product.id, e.target.value)}
+                              onFocus={(e) => e.target.select()}
+                              className="w-16 h-8 text-center"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => removeItem(item.product.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Additional Details Section */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pb-2 border-b">Delivery & Payment</h3>
+                  <div className="grid gap-6">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="shippingFee">Shipping Fee</Label>
+                        <Input id="shippingFee" type="number" value={shippingFee} onChange={(e) => setShippingFee(e.target.value)} placeholder="0.00" disabled={isPickup} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Total Amount</Label>
+                        <div className="font-bold text-xl text-primary">₱{totalAmount.toFixed(2)}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 bg-muted/50 p-3 rounded-md">
+                      <Checkbox id="rushShip-create" checked={rushShip} onCheckedChange={(checked) => setRushShip(Boolean(checked))} />
+                      <Label htmlFor="rushShip-create" className="font-medium cursor-pointer">Rush Ship</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2 bg-muted/50 p-3 rounded-md">
+                      <Checkbox
+                        id="pickup-create"
+                        checked={isPickup}
+                        onCheckedChange={(checked) => {
+                          const isChecked = Boolean(checked);
+                          setIsPickup(isChecked);
+                          if (isChecked) {
+                            setShippingFee("0");
+                          }
+                        }}
+                      />
+                      <Label htmlFor="pickup-create" className="font-medium cursor-pointer">Pick Up</Label>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="courierName">Courier Name</Label>
+                        <Input id="courierName" value={courierName} onChange={(e) => setCourierName(e.target.value)} placeholder="Lalamove, J&T, etc." />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="trackingNumber">Tracking Number</Label>
+                        <Input id="trackingNumber" value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="TRACKING-123" />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="remarks-create">Remarks</Label>
+                      <Select onValueChange={(value: OrderRemark) => setRemarks(value)} value={remarks}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a remark (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {remarksOptions.map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="batchId">Delivery Batch</Label>
+                        <Select onValueChange={(value) => setBatchId(value)} value={batchId || ''}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select batch" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hold">Hold for Next Batch</SelectItem>
+                            <SelectItem value="none">Normal Delivery</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="paymentMethod">Payment Method</Label>
+                        <Select onValueChange={(value: PaymentMethod) => setPaymentMethod(value)} value={paymentMethod}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentMethods.map((method) => (
+                              <SelectItem key={method} value={method}>
+                                {method}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4 pb-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="paymentStatus">Payment Status</Label>
+                        <Select onValueChange={(value: PaymentStatus) => setPaymentStatus(value)} value={paymentStatus} disabled={batchId === 'hold'}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentStatuses.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="shippingStatus">Shipping Status</Label>
+                        <Select onValueChange={(value: ShippingStatus) => setShippingStatus(value)} value={shippingStatus}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {shippingStatuses.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="p-6 border-t mt-auto">
+            <Button variant="outline" onClick={handleClose} className="flex-1" disabled={isSubmitting}>
+              {lastCreatedOrder ? 'Close' : 'Cancel'}
+            </Button>
+            {!lastCreatedOrder && <Button onClick={handleSave} className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Order"}
+            </Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <SelectProductDialog
+        isOpen={isProductSelectOpen}
+        onClose={() => setProductSelectOpen(false)}
+        onProductSelect={handleProductSelect}
+        products={products}
+      />
+    </>
+  );
+}

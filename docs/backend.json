@@ -1,0 +1,187 @@
+
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "type": "object",
+      "description": "Represents a customer in the system, who can also be an admin user.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the customer."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the customer.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the customer."
+        },
+        "avatar": {
+          "type": "string",
+          "description": "URL to the customer's avatar image."
+        },
+        "address": {
+          "type": "object",
+          "properties": {
+            "street": { "type": "string" },
+            "city": { "type": "string" },
+            "state": { "type": "string" },
+            "zip": { "type": "string" }
+          }
+        },
+        "orderHistory": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "orderId": {"type": "string"},
+                    "date": {"type": "string"},
+                    "amount": {"type": "number"}
+                }
+            }
+        },
+        "totalSpent": {
+            "type": "number"
+        },
+        "role": {
+            "type": "string",
+            "description": "The role of the user, e.g., 'admin' or 'super admin'.",
+            "enum": ["admin", "super admin", "overseer", "packer"]
+        }
+      },
+      "required": [
+        "name",
+        "email"
+      ]
+    },
+    "Order": {
+      "title": "Order",
+      "type": "object",
+      "description": "Represents an order placed by a customer.",
+      "properties": {
+        "customerName": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "orderDate": { "type": "string", "format": "date" },
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" },
+        "shippingFee": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["COD", "GCash", "Bank Transfer"]},
+        "paymentStatus": { "type": "string", "enum": ["Paid", "Unpaid", "Hold", "PAID PENDING"] },
+        "shippingStatus": { "type": "string", "enum": ["Pending", "Ready", "Shipped", "Delivered", "Cancelled"] },
+        "batchId": { "type": ["string", "null"] },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp of when the order was created."
+        },
+        "createdBy": {
+          "type": "object",
+          "properties": {
+            "uid": { "type": "string" },
+            "name": { "type": "string" }
+          },
+          "required": ["uid", "name"]
+        },
+        "customerId": { "type": "string" },
+        "customerEmail": { "type": "string", "format": "email" },
+        "courierName": { "type": "string", "description": "Name of the courier service handling the shipment." },
+        "trackingNumber": { "type": "string", "description": "Tracking number for the shipment." },
+        "remarks": { "type": "string", "description": "Internal notes or remarks about the order.", "enum": ["PLUS Branch 1", "PLUS Branch 2", "PLUS Warehouse", ""] },
+        "rushShip": { "type": "boolean", "description": "Indicates if the order is a rush shipment." }
+      },
+      "required": [
+        "customerName",
+        "itemName",
+        "quantity",
+        "price",
+        "shippingFee",
+        "totalAmount",
+        "paymentMethod",
+        "paymentStatus",
+        "shippingStatus",
+        "createdAt",
+        "customerId",
+        "createdBy",
+        "rushShip"
+      ]
+    },
+    "Batch": {
+      "title": "Batch",
+      "type": "object",
+      "description": "Represents a delivery cycle.",
+      "properties": {
+        "batchName": { "type": "string" },
+        "deliveryDate": { "type": "string", "format": "date" },
+        "cutoffDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Open", "Closed", "Delivered", "Cancelled"] },
+        "totalOrders": { "type": "number" },
+        "totalSales": { "type": "number" }
+      },
+      "required": ["batchName", "deliveryDate", "cutoffDate", "status"]
+    },
+    "Product": {
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product in the inventory.",
+      "properties": {
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "description": { "type": "string" },
+        "quantity": { 
+          "type": "object",
+          "properties": {
+            "branch1": { "type": "number" },
+            "branch2": { "type": "number" },
+            "warehouse": { "type": "number" }
+          },
+          "required": ["branch1", "branch2", "warehouse"]
+        },
+        "cost": { "type": "number" },
+        "retailPrice": { "type": "number" },
+        "images": { 
+          "type": "array",
+          "items": { "type": "string", "format": "uri" }
+        }
+      },
+      "required": ["name", "sku", "quantity", "cost", "retailPrice"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "/customers/{customerId}": {
+      "schema": {
+        "$ref": "#/entities/Customer"
+      },
+      "description": "Stores customer profiles, which include user roles."
+    },
+    "/orders/{orderId}": {
+        "schema": {
+            "$ref": "#/entities/Order"
+        },
+        "description": "Stores all orders."
+    },
+    "/batches/{batchId}": {
+        "schema": {
+            "$ref": "#/entities/Batch"
+        },
+        "description": "Stores all delivery batches."
+    },
+    "/products/{productId}": {
+        "schema": {
+            "$ref": "#/entities/Product"
+        },
+        "description": "Stores all inventory products."
+    }
+  }
+}

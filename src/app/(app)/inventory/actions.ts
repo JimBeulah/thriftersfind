@@ -1,0 +1,198 @@
+"use server";
+
+import { Product } from "@/lib/types";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth-server";
+
+export async function getProducts(): Promise<Product[]> {
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return [];
+    }
+
+    const isSuperAdmin = user.role?.name === 'Super Admin';
+
+    const products = await prisma.product.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Filter products based on user role
+    const filteredProducts = isSuperAdmin
+      ? products
+      : products.filter(product => {
+        if (!(product as any).createdBy) return false;
+        const createdByData = (product as any).createdBy as any;
+        return createdByData?.uid === user.id;
+      });
+
+    return filteredProducts.map(product => ({
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      description: product.description || "",
+      branch1: typeof product.branch1 === 'number' ? product.branch1 : 0,
+      branch2: typeof product.branch2 === 'number' ? product.branch2 : 0,
+      warehouse: typeof product.warehouse === 'number' ? product.warehouse : 0,
+      totalStock: (product.branch1 || 0) + (product.branch2 || 0) + (product.warehouse || 0),
+      alertStock: typeof product.alertStock === 'number' ? product.alertStock : 0,
+      cost: typeof product.cost === 'number' ? product.cost : 0,
+      retailPrice: typeof product.retailPrice === 'number' ? product.retailPrice : 0,
+      images: Array.isArray(product.images) ? (product.images as unknown as string[]) : [],
+      batchId: product.batchId,
+    }));
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    throw new Error("Failed to fetch products. Please try again later.");
+  }
+}
+
+export async function createProduct(productData: Omit<Product, 'id' | 'totalStock'>): Promise<Product> {
+  try {
+    const user = await getCurrentUser();
+    const createdBy = user ? {
+      uid: user.id,
+      name: user.name,
+      email: user.email
+    } : { uid: "system", name: "System" };
+
+    // Check if SKU already exists
+    const existingProduct = await prisma.product.findUnique({
+      where: { sku: productData.sku }
+    });
+
+    if (existingProduct) {
+      throw new Error(`Product with SKU "${productData.sku}" already exists`);
+    }
+
+    const totalStock = (productData.branch1 || 0) + (productData.branch2 || 0) + (productData.warehouse || 0);
+    const id = `c${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+
+    // Use raw query to bypass outdated Prisma client validation for batchId and createdBy
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO products (id, name, sku, description, branch1, branch2, warehouse, alertStock, cost, retailPrice, images, batchId, createdBy, createdAt, updatedAt) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
+      id,
+      productData.name,
+      productData.sku,
+      productData.description || null,
+      productData.branch1 || 0,
+      productData.branch2 || 0,
+      productData.warehouse || 0,
+      productData.alertStock || 0,
+      productData.cost || 0,
+      productData.retailPrice || 0,
+      JSON.stringify(productData.images || []),
+      productData.batchId || null,
+      JSON.stringify(createdBy)
+    );
+
+    return {
+      id,
+      name: productData.name,
+      sku: productData.sku,
+      description: productData.description || "",
+      branch1: productData.branch1 || 0,
+      branch2: productData.branch2 || 0,
+      warehouse: productData.warehouse || 0,
+      totalStock: totalStock,
+      alertStock: productData.alertStock || 0,
+      cost: productData.cost || 0,
+      retailPrice: productData.retailPrice || 0,
+      images: productData.images || [],
+      batchId: productData.batchId,
+    };
+  } catch (error) {
+    console.error("CRITICAL ERROR in createProduct:", error);
+    if (error instanceof Error) {
+      console.error("Error Message:", error.message);
+      console.error("Error Stack:", error.stack);
+    }
+    throw error;
+  }
+}
+
+export async function updateProduct(id: string, productData: Partial<Omit<Product, 'id' | 'totalStock'>>): Promise<Product> {
+  try {
+    // If SKU is being updated, check if it already exists (but not for the current product)
+    if (productData.sku) {
+      const existingProduct = await prisma.product.findFirst({
+        where: {
+          sku: productData.sku,
+          id: { not: id }
+        }
+      });
+
+      if (existingProduct) {
+        throw new Error(`Product with SKU "${productData.sku}" already exists`);
+      }
+    }
+
+    // Get current product to calculate new totalStock if quantity changes
+    const currentProduct = await prisma.product.findUnique({
+      where: { id }
+    });
+
+    if (!currentProduct) {
+      throw new Error('Product not found');
+    }
+
+    // Use raw query for update to handle potential batchId validation issues
+    const updates = [];
+    const values = [];
+
+    if (productData.name !== undefined) { updates.push("name = ?"); values.push(productData.name); }
+    if (productData.sku !== undefined) { updates.push("sku = ?"); values.push(productData.sku); }
+    if (productData.description !== undefined) { updates.push("description = ?"); values.push(productData.description); }
+    if (productData.branch1 !== undefined) { updates.push("branch1 = ?"); values.push(productData.branch1); }
+    if (productData.branch2 !== undefined) { updates.push("branch2 = ?"); values.push(productData.branch2); }
+    if (productData.warehouse !== undefined) { updates.push("warehouse = ?"); values.push(productData.warehouse); }
+    if (productData.alertStock !== undefined) { updates.push("alertStock = ?"); values.push(productData.alertStock); }
+    if (productData.cost !== undefined) { updates.push("cost = ?"); values.push(productData.cost); }
+    if (productData.retailPrice !== undefined) { updates.push("retailPrice = ?"); values.push(productData.retailPrice); }
+    if (productData.images !== undefined) { updates.push("images = ?"); values.push(JSON.stringify(productData.images)); }
+    if (productData.batchId !== undefined) { updates.push("batchId = ?"); values.push(productData.batchId); }
+
+    updates.push("updatedAt = NOW(3)");
+
+    if (updates.length > 0) {
+      const sql = `UPDATE products SET ${updates.join(", ")} WHERE id = ?`;
+      values.push(id);
+      await prisma.$executeRawUnsafe(sql, ...values);
+    }
+
+    const updatedProduct = await prisma.product.findUnique({ where: { id } });
+
+    if (!updatedProduct) throw new Error("Failed to retrieve updated product");
+
+    return {
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      sku: updatedProduct.sku,
+      description: updatedProduct.description || "",
+      branch1: updatedProduct.branch1,
+      branch2: updatedProduct.branch2,
+      warehouse: updatedProduct.warehouse,
+      totalStock: updatedProduct.branch1 + updatedProduct.branch2 + updatedProduct.warehouse,
+      alertStock: updatedProduct.alertStock,
+      cost: updatedProduct.cost,
+      retailPrice: updatedProduct.retailPrice || 0,
+      images: Array.isArray(updatedProduct.images) ? (updatedProduct.images as unknown as string[]) : [],
+      batchId: updatedProduct.batchId,
+    };
+  } catch (error) {
+    console.error("Error in updateProduct:", error);
+    throw error;
+  }
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  try {
+    await prisma.product.delete({
+      where: { id },
+    });
+  } catch (error) {
+    throw new Error(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
