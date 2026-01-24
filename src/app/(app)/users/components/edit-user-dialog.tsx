@@ -41,6 +41,23 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
   reports: true,
   users: false,
   settings: false,
+  adminManage: false,
+  stations: false,
+  preOrders: false,
+};
+
+const PERMISSION_LABELS: Record<keyof UserPermissions, string> = {
+  dashboard: "Dashboard",
+  orders: "Orders",
+  batches: "Batches",
+  inventory: "Inventory",
+  customers: "Customers",
+  reports: "Reports",
+  users: "Users",
+  settings: "Settings",
+  adminManage: "Admin Manage",
+  stations: "Courier & Pickup Stations",
+  preOrders: "Pre order",
 };
 
 export function EditUserDialog({ isOpen, onClose, user, onUserUpdated }: EditUserDialogProps) {
@@ -63,7 +80,10 @@ export function EditUserDialog({ isOpen, onClose, user, onUserUpdated }: EditUse
       setEmail(user.email);
       setRoleId(user.roleId || "");
       setBranchId(user.branchId || "");
-      setPermissions(user.permissions || DEFAULT_PERMISSIONS);
+      setPermissions({
+        ...DEFAULT_PERMISSIONS,
+        ...(user.permissions || {})
+      });
       setPassword(""); // Don't populate password for security
     }
   }, [user]);
@@ -169,8 +189,8 @@ export function EditUserDialog({ isOpen, onClose, user, onUserUpdated }: EditUse
             <div className="grid gap-4 bg-muted/30 p-4 rounded-lg">
               {Object.entries(permissions).map(([feature, enabled]) => (
                 <div key={feature} className="flex items-center justify-between">
-                  <Label htmlFor={`edit-feature-${feature}`} className="capitalize cursor-pointer">
-                    {feature}
+                  <Label htmlFor={`edit-feature-${feature}`} className="cursor-pointer">
+                    {PERMISSION_LABELS[feature as keyof UserPermissions]}
                   </Label>
                   <Switch
                     id={`edit-feature-${feature}`}

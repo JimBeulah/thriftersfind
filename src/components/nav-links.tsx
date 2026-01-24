@@ -19,6 +19,9 @@ import {
   Database,
   Download,
   MapPin,
+  Shield,
+  Computer,
+  CalendarClock,
 } from "lucide-react";
 import {
   SidebarMenu,
@@ -45,6 +48,7 @@ const links = [
     icon: <ShoppingCart />,
     permission: "orders",
   },
+
   {
     href: "/batches",
     label: "Batches",
@@ -67,14 +71,7 @@ const links = [
     href: "/stations",
     label: "Courier & Pickup Stations",
     icon: <MapPin />,
-    permission: "settings", // Assuming stations falls under settings or needs its own permission. using 'settings' or 'dashboard' or NONE?
-    // User requested "disabled features must not appear". Custom logic needed.
-    // Let's assume stations is allowed for everyone or maybe check if there's a permission.
-    // The previous code had admin: true.
-    // I'll leave it as visible or map to 'settings' for now, or maybe 'dashboard' if general.
-    // Actually, let's map it to 'settings' for safety, or create a 'stations' permission if needed.
-    // Looking at actions, default permissions include 'settings'.
-    // Let's rely on 'settings' for now as it's configuration.
+    permission: "stations",
   },
   {
     href: "/users",
@@ -94,6 +91,14 @@ const links = [
     icon: <DollarSign />,
     permission: "reports", // map sales to reports for now? or maybe it needs 'sales' permission? defaulting to reports.
   },
+
+  {
+    href: "/pre-orders",
+    label: "Pre orders",
+    icon: <ShoppingCart />,
+    permission: "preOrders",
+  },
+
   {
     href: "/profile",
     label: "Profile",
@@ -118,6 +123,7 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
   const [isMounted, setIsMounted] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [adminManageOpen, setAdminManageOpen] = React.useState(false);
+  const [preOrdersOpen, setPreOrdersOpen] = React.useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -127,6 +133,12 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
     // Auto-open Settings accordion if on a settings-related page
     if (pathname.startsWith('/settings')) {
       setSettingsOpen(true);
+    }
+    if (pathname.startsWith('/admin')) {
+      setAdminManageOpen(true);
+    }
+    if (pathname.startsWith('/pre-orders')) {
+      setPreOrdersOpen(true);
     }
   }, [pathname]);
 
@@ -142,7 +154,7 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
 
   if (!isMounted) return null;
 
-  const isSuperAdmin = role === 'Super Admin';
+  const isSuperAdmin = role?.toLowerCase() === 'super admin';
 
   // Debug logging
   console.log('NavLinks - Role:', role);
@@ -150,8 +162,7 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
 
   const filteredLinks = links.filter(link => {
     if (link.permission === null) return true; // Always visible
-    if (isSuperAdmin) return true; // Super Admin sees all associated permissions
-    // Note: Stations mapped to 'settings'. If users have 'settings: false', they won't see Stations.
+    // if (isSuperAdmin) return true; // REMOVED: Super Admin sees all associated permissions
 
     // Check strict permission
     const permKey = link.permission as keyof UserPermissions;
@@ -161,6 +172,57 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
   return (
     <SidebarMenu>
       {filteredLinks.map((link) => {
+        // Special handling for Pre-orders - make it collapsible
+        if (link.href === '/pre-orders') {
+          return (
+            <Collapsible
+              key={link.href}
+              open={preOrdersOpen}
+              onOpenChange={setPreOrdersOpen}
+              className="group/collapsible"
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip={link.label}
+                    isActive={isActive(link.href)}
+                  >
+                    {link.icon}
+                    <span>{link.label}</span>
+                    <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenu className="pl-4 border-l ml-4 mt-1">
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === '/pre-orders/all'}
+                        tooltip="All Pre-orders"
+                      >
+                        <Link href="/pre-orders/all">
+                          <span>orders</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === '/pre-orders/inventory'}
+                        tooltip="Pre-order Inventory"
+                      >
+                        <Link href="/pre-orders/inventory">
+                          <span>Inventory</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          );
+        }
+
         // Special handling for Settings - make it collapsible
         if (link.href === '/settings') {
           return (
@@ -232,11 +294,10 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
       })}
 
       {/* Admin Manage Section - Only visible for Super Admin */}
-      {isSuperAdmin && (
+      {/* Admin Manage Section - Only visible users with adminManage permission */}
+      {(permissions?.adminManage) && (
         <>
-          {/* Boundary separator */}
           <div className="my-2 border-t border-sidebar-border" />
-
           <Collapsible
             open={adminManageOpen}
             onOpenChange={setAdminManageOpen}
@@ -245,22 +306,44 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton tooltip="Admin Manage">
-                  <ShieldCheck />
+                  <Shield className="h-4 w-4" />
                   <span>Admin Manage</span>
                   <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenu className="pl-4 border-l ml-4 mt-1">
-                  {/* Add admin management items here */}
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip="Manage System"
+                      tooltip="Sales Logs"
+                      isActive={isActive('/admin/sales-logs')}
                     >
-                      <div className="text-muted-foreground text-sm py-2">
-                        Admin features coming soon
-                      </div>
+                      <Link href="/admin/sales-logs">
+                        <span>Sales Logs</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip="Admin Logs"
+                      isActive={isActive('/admin/admin-logs')}
+                    >
+                      <Link href="/admin/admin-logs">
+                        <span>Admin Logs</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip="Inventory Logs"
+                      isActive={isActive('/admin/inventory-logs')}
+                    >
+                      <Link href="/admin/inventory-logs">
+                        <span>Inventory Logs</span>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>

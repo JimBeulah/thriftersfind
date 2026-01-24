@@ -41,6 +41,23 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
   reports: true,
   users: false,
   settings: false,
+  adminManage: false,
+  stations: false,
+  preOrders: false,
+};
+
+const PERMISSION_LABELS: Record<keyof UserPermissions, string> = {
+  dashboard: "Dashboard",
+  orders: "Orders",
+  batches: "Batches",
+  inventory: "Inventory",
+  customers: "Customers",
+  reports: "Reports",
+  users: "Users",
+  settings: "Settings",
+  adminManage: "Admin Manage",
+  stations: "Courier & Pickup Stations",
+  preOrders: "Pre order",
 };
 
 export function CreateUserDialog({ isOpen, onClose, onUserAdded }: CreateUserDialogProps) {
@@ -152,8 +169,8 @@ export function CreateUserDialog({ isOpen, onClose, onUserAdded }: CreateUserDia
             <div className="grid gap-4 bg-muted/30 p-4 rounded-lg">
               {Object.entries(permissions).map(([feature, enabled]) => (
                 <div key={feature} className="flex items-center justify-between">
-                  <Label htmlFor={`feature-${feature}`} className="capitalize cursor-pointer">
-                    {feature}
+                  <Label htmlFor={`feature-${feature}`} className="cursor-pointer">
+                    {PERMISSION_LABELS[feature as keyof UserPermissions]}
                   </Label>
                   <Switch
                     id={`feature-${feature}`}

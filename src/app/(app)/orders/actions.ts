@@ -55,6 +55,14 @@ export async function getOrders(): Promise<Order[]> {
     trackingNumber: order.trackingNumber || "",
     remarks: (order.remarks as OrderRemark) || "",
     rushShip: order.rushShip,
+    batch: order.batch ? {
+      ...order.batch,
+      deliveryDate: order.batch.deliveryDate.toISOString().split('T')[0],
+      cutoffDate: order.batch.cutoffDate.toISOString().split('T')[0],
+      status: order.batch.status as any,
+      totalOrders: order.batch.totalOrders || 0,
+      totalSales: order.batch.totalSales || 0,
+    } : undefined,
   }));
 }
 
@@ -141,6 +149,39 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt'> & {
         }
       }
 
+      // 4. Create Sales Log (Raw SQL)
+      const logId = `sl${Math.random().toString(36).substring(2, 15)}`;
+      const ordersJson = JSON.stringify({
+        id: orderId,
+        orderDate: orderData.orderDate,
+        paymentStatus: orderData.paymentStatus,
+        paymentMethod: orderData.paymentMethod,
+        shippingStatus: orderData.shippingStatus,
+        createdBy: createdBy
+      });
+      const shipmentsJson = JSON.stringify({
+        address: orderData.address,
+        courier: orderData.courierName,
+        tracking: orderData.trackingNumber,
+        shippingFee: orderData.shippingFee
+      });
+      const orderItemsJson = orderData.items ? JSON.stringify(orderData.items) : null;
+
+      await tx.$executeRawUnsafe(
+        `INSERT INTO sales_logs (id, orderId, description, products, orders, customerName, totalAmount, shipments, order_items, createdAt) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        logId,
+        orderId,
+        "Order Created",
+        orderData.itemName,
+        ordersJson,
+        orderData.customerName,
+        orderData.totalAmount,
+        shipmentsJson,
+        orderItemsJson,
+        now
+      );
+
       return { id: orderId, createdAt: now };
     });
 
@@ -188,6 +229,44 @@ export async function updateOrder(id: string, data: Partial<Order>): Promise<Ord
         createdBy: data.createdBy as any,
       },
     });
+
+    // Create Sales Log for Update
+    const now = new Date();
+    const logId = `sl${Math.random().toString(36).substring(2, 15)}`;
+
+    // Parse items if string
+    const items = (updatedOrder as any).items ? (typeof (updatedOrder as any).items === 'string' ? JSON.parse((updatedOrder as any).items) : (updatedOrder as any).items) : [];
+
+    const ordersJson = JSON.stringify({
+      id: updatedOrder.id,
+      orderDate: updatedOrder.orderDate,
+      paymentStatus: updatedOrder.paymentStatus,
+      paymentMethod: updatedOrder.paymentMethod,
+      shippingStatus: updatedOrder.shippingStatus,
+      createdBy: (updatedOrder as any).createdBy
+    });
+    const shipmentsJson = JSON.stringify({
+      address: updatedOrder.address,
+      courier: updatedOrder.courierName,
+      tracking: updatedOrder.trackingNumber,
+      shippingFee: updatedOrder.shippingFee
+    });
+    const orderItemsJson = JSON.stringify(items);
+
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO sales_logs (id, orderId, description, products, orders, customerName, totalAmount, shipments, order_items, createdAt) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      logId,
+      updatedOrder.id,
+      "Order Updated",
+      updatedOrder.itemName,
+      ordersJson,
+      updatedOrder.customerName,
+      updatedOrder.totalAmount,
+      shipmentsJson,
+      orderItemsJson,
+      now
+    );
 
     revalidatePath("/orders");
     revalidatePath("/customers");
@@ -314,6 +393,41 @@ export async function cancelOrder(orderId: string): Promise<void> {
         }
       });
       console.log(`Order ${orderId} marked as Cancelled`);
+
+      // 5. Create Sales Log for Cancellation
+      const now = new Date();
+      const logId = `sl${Math.random().toString(36).substring(2, 15)}`;
+
+      const ordersJson = JSON.stringify({
+        id: orderId,
+        orderDate: order.orderDate,
+        paymentStatus: order.paymentStatus,
+        paymentMethod: order.paymentMethod,
+        shippingStatus: "Cancelled",
+        createdBy: (order as any).createdBy
+      });
+      const shipmentsJson = JSON.stringify({
+        address: order.address,
+        courier: order.courierName,
+        tracking: order.trackingNumber,
+        shippingFee: order.shippingFee
+      });
+      const orderItemsJson = JSON.stringify(items); // items was parsed earlier in cancelOrder
+
+      await tx.$executeRawUnsafe(
+        `INSERT INTO sales_logs (id, orderId, description, products, orders, customerName, totalAmount, shipments, order_items, createdAt) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        logId,
+        orderId,
+        "Order Cancelled",
+        order.itemName,
+        ordersJson,
+        order.customerName,
+        order.totalAmount,
+        shipmentsJson,
+        orderItemsJson,
+        now
+      );
     });
 
     revalidatePath("/orders");

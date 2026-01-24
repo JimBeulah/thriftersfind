@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoreHorizontal, PlusCircle, Search, Calendar as CalendarIcon, X, MessageCircle } from "lucide-react";
 import type { Order, PaymentStatus, ShippingStatus, Customer, PaymentMethod, Batch, OrderRemark, Product } from "@/lib/types";
+import { Station } from "../../stations/actions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EditOrderDialog } from "./edit-order-dialog";
@@ -80,9 +81,10 @@ interface OrderTableProps {
   orders: Order[];
   customers: Customer[];
   products: Product[];
+  stations: Station[];
 }
 
-export default function OrderTable({ orders, customers, products }: OrderTableProps) {
+export default function OrderTable({ orders, customers, products, stations }: OrderTableProps) {
   const router = useRouter();
   const [filteredOrders, setFilteredOrders] = React.useState<Order[]>(orders);
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -439,6 +441,7 @@ export default function OrderTable({ orders, customers, products }: OrderTablePr
         onClose={() => setCreateDialogOpen(false)}
         customers={customers}
         products={products}
+        stations={stations}
       />
 
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setCancelDialogOpen}>

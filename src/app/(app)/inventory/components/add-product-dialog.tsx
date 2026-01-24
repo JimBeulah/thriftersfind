@@ -102,11 +102,22 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
   };
 
   const handleSave = async () => {
-    if (!name || !sku || !cost || !retailPrice) {
+    const missingFields = [];
+    if (!name) missingFields.push("Product Name");
+    if (!description) missingFields.push("Description");
+    if (!cost || parseFloat(cost) <= 0) missingFields.push("Cost");
+    if (!retailPrice || parseFloat(retailPrice) <= 0) missingFields.push("Retail Price");
+    if (!branch1Qty && branch1Qty !== "0") missingFields.push("Branch 1 Qty");
+    if (!branch2Qty && branch2Qty !== "0") missingFields.push("Branch 2 Qty");
+    if (!warehouseQty && warehouseQty !== "0") missingFields.push("Warehouse Qty");
+    if (!alertStock && alertStock !== "0") missingFields.push("Alert Stock");
+    if (images.length === 0) missingFields.push("Product Images");
+
+    if (missingFields.length > 0) {
       toast({
         variant: "destructive",
         title: "Missing Information",
-        description: "Please fill out Name, SKU, Cost and Retail Price.",
+        description: `Please fill in the following fields: ${missingFields.join(", ")}`,
       });
       return;
     }

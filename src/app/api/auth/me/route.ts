@@ -12,15 +12,12 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ user: null }, { status: 401 });
         }
 
-        // Check if relations are available in the current client
-        const canInclude = (prisma.user as any).fields?.role_rel?.isRelation;
-
-        const user = await (prisma.user as any).findUnique({
+        const user = await prisma.user.findUnique({
             where: { id: sessionId },
-            include: canInclude ? {
+            include: {
                 role_rel: true,
                 branch: true,
-            } : undefined,
+            },
         });
 
         if (!user) {
@@ -38,7 +35,12 @@ export async function GET(request: NextRequest) {
                 name: user.role_rel.name,
                 createdAt: user.role_rel.createdAt?.toISOString() || new Date().toISOString(),
                 updatedAt: user.role_rel.updatedAt?.toISOString() || new Date().toISOString(),
-            } : null,
+            } : (user.role ? {
+                id: 'legacy_role',
+                name: user.role,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            } : null),
             branchId: user.branchId,
             branch: user.branch ? {
                 id: user.branch.id,

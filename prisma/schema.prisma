@@ -24,6 +24,7 @@ model Customer {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
   orders       Order[]
+  preOrders    PreOrder[]
 
   @@map("customers")
 }
@@ -87,6 +88,8 @@ model Batch {
   updatedAt    DateTime  @updatedAt
   orders       Order[]
   products     Product[]
+  preOrders    PreOrder[]
+  preOrderInventory PreOrderInventory[]
 
   @@map("batches")
 }
@@ -108,6 +111,8 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
   batch       Batch?   @relation(fields: [batchId], references: [id])
+  preOrderItems PreOrderItem[]
+  preOrderInventory PreOrderInventory[]
 
   @@index([batchId], map: "products_batchId_fkey")
   @@map("products")
@@ -121,7 +126,7 @@ model User {
   role        String?
   roleId      String?
   branchId    String?
-  permissions Json?    @default("{\"dashboard\":true,\"orders\":true,\"batches\":true,\"inventory\":true,\"customers\":true,\"reports\":true,\"users\":false,\"settings\":false}")
+  permissions Json?    @default("{\"dashboard\":true,\"orders\":true,\"batches\":true,\"inventory\":true,\"customers\":true,\"reports\":true,\"users\":false,\"settings\":false,\"adminManage\":false,\"stations\":false,\"preOrders\":false}")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
   branch      Branch?  @relation(fields: [branchId], references: [id])
@@ -192,13 +197,13 @@ model DatabaseOperation {
 model SalesLog {
   id             String   @id @default(cuid())
   orderId        String?
-  action         String   // 'ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_CANCELLED', 'PAYMENT_UPDATED', etc.
+  products       String?  // Renamed from action
   description    String?
-  performedBy    Json?    // { uid: string, name: string, role: string }
+  orders         Json?    // Renamed from performedBy
   customerName   String?
   totalAmount    Float?
-  previousData   Json?    // Store previous state for updates
-  newData        Json?    // Store new state for updates
+  shipments      Json?    // Renamed from previousData
+  order_items    Json?    // Renamed from newData
   createdAt      DateTime @default(now())
 
   @@index([orderId])
@@ -223,4 +228,68 @@ model AdminLog {
   @@index([module])
   @@index([createdAt])
   @@map("admin_logs")
+}
+
+model PreOrder {
+  id            String          @id @default(cuid())
+  customerName  String
+  contactNumber String?
+  address       String?
+  orderDate     DateTime?
+  totalAmount   Float
+  paymentMethod String?
+  paymentStatus String?         @default("Unpaid")
+  depositAmount Float?          @default(0)
+  batchId       String?
+  customerId    String
+  customerEmail String?
+  remarks       String?
+  createdBy     Json?           // { uid: string, name: string }
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+  batch         Batch?          @relation(fields: [batchId], references: [id])
+  customer      Customer        @relation(fields: [customerId], references: [id])
+  items         PreOrderItem[]
+  inventory     PreOrderInventory[]
+
+  @@index([batchId], map: "pre_orders_batchId_fkey")
+  @@index([customerId], map: "pre_orders_customerId_fkey")
+  @@map("pre_orders")
+}
+
+model PreOrderItem {
+  id           String   @id @default(cuid())
+  preOrderId   String
+  productId    String
+  productName  String
+  quantity     Int
+  pricePerUnit Float
+  totalPrice   Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+  preOrder     PreOrder @relation(fields: [preOrderId], references: [id], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [id])
+
+  @@index([preOrderId], map: "pre_order_items_preOrderId_fkey")
+  @@index([productId], map: "pre_order_items_productId_fkey")
+  @@map("pre_order_items")
+}
+
+model PreOrderInventory {
+  id               String   @id @default(cuid())
+  productId        String
+  batchId          String?
+  preOrderId       String
+  quantityReserved Int
+  status           String   @default("Reserved") // 'Reserved', 'Fulfilled', 'Cancelled'
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+  product          Product  @relation(fields: [productId], references: [id])
+  batch            Batch?   @relation(fields: [batchId], references: [id])
+  preOrder         PreOrder @relation(fields: [preOrderId], references: [id], onDelete: Cascade)
+
+  @@index([productId], map: "pre_order_inventory_productId_fkey")
+  @@index([batchId], map: "pre_order_inventory_batchId_fkey")
+  @@index([preOrderId], map: "pre_order_inventory_preOrderId_fkey")
+  @@map("pre_order_inventory")
 }

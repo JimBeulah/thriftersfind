@@ -32,12 +32,14 @@ import { Image as ImageIcon } from "lucide-react";
 import { createOrder } from "../actions";
 import { useRouter } from "next/navigation";
 import { createCustomer } from "../../customers/actions";
+import { Station } from "../../stations/actions";
 
 interface CreateOrderDialogProps {
   isOpen: boolean;
   onClose: () => void;
   customers: Customer[];
   products: Product[];
+  stations: Station[];
 }
 
 const paymentStatuses: PaymentStatus[] = ["Hold", "Paid", "Unpaid", "PAID PENDING"];
@@ -51,6 +53,7 @@ export function CreateOrderDialog({
   onClose,
   customers,
   products,
+  stations,
 }: CreateOrderDialogProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -72,6 +75,7 @@ export function CreateOrderDialog({
   const [remarks, setRemarks] = useState<OrderRemark>('');
   const [rushShip, setRushShip] = useState(false);
   const [isPickup, setIsPickup] = useState(false);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
 
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -100,6 +104,7 @@ export function CreateOrderDialog({
     setRemarks('');
     setRushShip(false);
     setIsPickup(false);
+    setSelectedStationId(null);
     setLastCreatedOrder(null);
     setIsSubmitting(false);
   };
@@ -494,24 +499,51 @@ export function CreateOrderDialog({
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 bg-muted/50 p-3 rounded-md">
-                      <Checkbox id="rushShip-create" checked={rushShip} onCheckedChange={(checked) => setRushShip(Boolean(checked))} />
-                      <Label htmlFor="rushShip-create" className="font-medium cursor-pointer">Rush Ship</Label>
+                    <div className="grid gap-2">
+                      <Label htmlFor="rushShip-create">Rush Ship</Label>
+                      <Select
+                        value={rushShip ? "yes" : "no"}
+                        onValueChange={(value) => setRushShip(value === "yes")}
+                      >
+                        <SelectTrigger id="rushShip-create">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="no">Standard Shipping</SelectItem>
+                          <SelectItem value="yes">Rush Shipping</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    <div className="flex items-center space-x-2 bg-muted/50 p-3 rounded-md">
-                      <Checkbox
-                        id="pickup-create"
-                        checked={isPickup}
-                        onCheckedChange={(checked) => {
-                          const isChecked = Boolean(checked);
-                          setIsPickup(isChecked);
-                          if (isChecked) {
+                    <div className="grid gap-2">
+                      <Label htmlFor="pickup-station">Pickup Options</Label>
+                      <Select
+                        value={isPickup && selectedStationId ? selectedStationId : "delivery"}
+                        onValueChange={(value) => {
+                          if (value === "delivery") {
+                            setIsPickup(false);
+                            setSelectedStationId(null);
+                            setCourierName(""); // Reset courier name if switching back to delivery
+                          } else {
+                            setIsPickup(true);
                             setShippingFee("0");
+                            setSelectedStationId(value);
                           }
                         }}
-                      />
-                      <Label htmlFor="pickup-create" className="font-medium cursor-pointer">Pick Up</Label>
+                      >
+                        <SelectTrigger id="pickup-station">
+                          <SelectValue placeholder="Select delivery method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="delivery">Standard Delivery</SelectItem>
+                          {stations.length > 0 && <div className="border-t my-1" />}
+                          {stations.map((station) => (
+                            <SelectItem key={station.id} value={station.id}>
+                              Pickup at {station.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-4">

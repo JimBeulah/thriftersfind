@@ -3,6 +3,8 @@
 import { User, Branch, UserPermissions, Role } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { getCurrentUser, checkPermission } from "@/lib/auth-server";
+import { revalidatePath } from "next/cache";
 
 export async function getUsers(): Promise<User[]> {
   const users = await (prisma.user as any).findMany({
@@ -106,6 +108,13 @@ export async function createUser(userData: {
   branchId?: string;
   permissions?: UserPermissions;
 }): Promise<{ user: User | null; error?: string }> {
+  // 1. Authentication & Permission Check
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return { user: null, error: "Unauthorized." };
+
+  const hasPermission = await checkPermission('users');
+  if (!hasPermission) return { user: null, error: "Permission denied." };
+
   // Check if email already exists
   const existingUser = await prisma.user.findUnique({
     where: { email: userData.email }
@@ -129,11 +138,6 @@ export async function createUser(userData: {
     }
   }
 
-  // Find Branch ID logic (assuming simple connect by ID handled by string id passed)
-  // But strictly speaking, prisma connect expects { id: ... } object usually or direct ID field setting.
-  // Since we are setting `branchId` directly in data, we don't strictly need nested connect if the schema supports scalar field writing.
-  // However, for role, we want to ensure the relation is set.
-
   // Create user
   // We set `role` string AND `role_rel` relation.
   const newUser = await prisma.user.create({
@@ -151,6 +155,33 @@ export async function createUser(userData: {
       branch: true
     }
   });
+
+  // 2. Admin Logging
+  try {
+    await (prisma as any).adminLog.create({
+      data: {
+        action: 'USER_CREATED',
+        module: 'USERS',
+        description: `User ${newUser.name} (${newUser.email}) was created.`,
+        performedBy: {
+          uid: currentUser.id,
+          name: currentUser.name,
+          role: currentUser.role?.name || 'Unknown'
+        },
+        targetId: newUser.id,
+        targetType: 'USER',
+        newData: {
+          name: newUser.name,
+          email: newUser.email,
+          role: (newUser as any).role_rel?.name,
+          branch: (newUser as any).branch?.name,
+          permissions: newUser.permissions
+        },
+      }
+    });
+  } catch (error) {
+    console.error("Failed to create admin log:", error);
+  }
 
   const user = newUser as any;
 
@@ -193,9 +224,40 @@ export async function updateUser(
     permissions?: UserPermissions;
   }
 ): Promise<{ user: User | null; error?: string }> {
+  // 1. Authentication Check
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return { user: null, error: "Unauthorized. Please log in." };
+  }
+
+  // 2. Permission Check
+  // Restricted: Only Super Admin can update others. Users can update themselves.
+  const isSelfUpdate = currentUser.id === id;
+  const userRoleName = currentUser.role?.name?.toLowerCase() || '';
+  const isSuperAdmin = userRoleName === 'super admin';
+
+  console.log('[updateUser] Permissions Check:', {
+    currentUserId: currentUser.id,
+    targetUserId: id,
+    userRoleName: currentUser.role?.name,
+    isSelfUpdate,
+    isSuperAdmin
+  });
+
+  if (!isSelfUpdate && !isSuperAdmin) {
+    return {
+      user: null,
+      error: `Permission Denied. Only Super Admins can update other users. Your role is identified as: '${currentUser.role?.name || 'None'}'`
+    };
+  }
+
   // Check if user exists
   const existingUser = await prisma.user.findUnique({
-    where: { id }
+    where: { id },
+    include: {
+      role_rel: true,
+      branch: true
+    }
   });
 
   if (!existingUser) {
@@ -229,6 +291,8 @@ export async function updateUser(
       roleConnect = { connect: { id: roleRecord.id } };
     }
   }
+
+  console.log('[updateUser] Permissions Payload:', userData.permissions);
 
   // Prepare update data
   const updateData: any = {
@@ -267,6 +331,49 @@ export async function updateUser(
     }
   });
 
+  // 3. Admin Logging
+  try {
+    const previousData = {
+      name: existingUser.name,
+      email: existingUser.email,
+      role: existingUser.role_rel?.name,
+      branch: existingUser.branch?.name,
+      permissions: existingUser.permissions
+    };
+
+    const newData = {
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role_rel?.name,
+      branch: updatedUser.branch?.name,
+      permissions: updatedUser.permissions
+    };
+
+    await (prisma as any).adminLog.create({
+      data: {
+        action: 'USER_UPDATED',
+        module: 'USERS',
+        description: `User ${updatedUser.name} (${updatedUser.email}) was updated.`,
+        performedBy: {
+          uid: currentUser.id,
+          name: currentUser.name,
+          role: currentUser.role?.name || 'Unknown'
+        },
+        targetId: updatedUser.id,
+        targetType: 'USER',
+        previousData: previousData,
+        newData: newData,
+      }
+    });
+  } catch (error) {
+    console.error("Failed to create admin log:", error);
+    // Don't fail the request if logging fails, just log the error
+  }
+
+  // Revalidate to ensure fresh data
+  revalidatePath('/users');
+  revalidatePath('/', 'layout');
+
   const user = updatedUser as any;
 
   return {
@@ -298,6 +405,13 @@ export async function updateUser(
 
 export async function deleteUser(id: string): Promise<{ success: boolean; error?: string }> {
   try {
+    // 1. Authentication & Permission Check
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return { success: false, error: "Unauthorized." };
+
+    const hasPermission = await checkPermission('users');
+    if (!hasPermission) return { success: false, error: "Permission denied." };
+
     const existingUser = await prisma.user.findUnique({
       where: { id }
     });
@@ -322,6 +436,30 @@ export async function deleteUser(id: string): Promise<{ success: boolean; error?
     await prisma.user.delete({
       where: { id }
     });
+
+    // 2. Admin Logging
+    try {
+      await (prisma as any).adminLog.create({
+        data: {
+          action: 'USER_DELETED',
+          module: 'USERS',
+          description: `User ${existingUser.name} (${existingUser.email}) was deleted.`,
+          performedBy: {
+            uid: currentUser.id,
+            name: currentUser.name,
+            role: currentUser.role?.name || 'Unknown'
+          },
+          targetId: id,
+          targetType: 'USER',
+          previousData: {
+            name: existingUser.name,
+            email: existingUser.email
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Failed to create admin log:", error);
+    }
 
     return { success: true };
   } catch (error) {

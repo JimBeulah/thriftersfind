@@ -10,15 +10,12 @@ export async function getCurrentUser(): Promise<User | null> {
         return null;
     }
 
-    // Check if relations are available in the current client
-    const canInclude = (prisma.user as any).fields?.role_rel?.isRelation;
-
     const user = await (prisma.user as any).findUnique({
         where: { id: sessionId },
-        include: canInclude ? {
+        include: {
             role_rel: true,
             branch: true,
-        } : undefined,
+        },
     });
 
     if (!user) {
@@ -54,8 +51,8 @@ export async function checkPermission(permission: keyof UserPermissions): Promis
     const user = await getCurrentUser();
     if (!user) return false;
 
-    // Super admin bypass (optional, but good practice)
-    if (user.role?.name === 'Super Admin') return true;
+    // Super admin bypass REMOVED to respect granular permissions
+    // if (user.role?.name === 'Super Admin') return true;
 
     return !!user.permissions?.[permission];
 }

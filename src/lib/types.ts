@@ -11,6 +11,9 @@ export type UserPermissions = {
   reports: boolean;
   users: boolean;
   settings: boolean;
+  adminManage: boolean;
+  stations: boolean;
+  preOrders: boolean;
 };
 
 export type User = {
@@ -112,6 +115,7 @@ export type Order = {
   trackingNumber?: string;
   remarks?: OrderRemark;
   rushShip: boolean;
+  batch?: Batch;
 };
 
 export type Batch = {
@@ -139,3 +143,14 @@ export type Product = {
   images: string[];
   batchId?: string | null;
 }
+
+export type Station = {
+  id: string;
+  name: string;
+  location: string;
+  type: string;
+  contactNumber?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  isActive: boolean;
+};
