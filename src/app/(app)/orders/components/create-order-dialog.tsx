@@ -58,7 +58,7 @@ export function CreateOrderDialog({
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customerName, setCustomerName] = useState("");
+  const [customerName, setCustomerName] = useState("Walk In Customer");
   const [contactNumber, setContactNumber] = useState("");
   const [address, setAddress] = useState("");
 
@@ -89,7 +89,7 @@ export function CreateOrderDialog({
   }, [selectedItems, shippingFee]);
 
   const resetForm = () => {
-    setCustomerName("");
+    setCustomerName("Walk In Customer");
     setContactNumber("");
     setAddress("");
     setSelectedItems([]);
@@ -265,7 +265,7 @@ export function CreateOrderDialog({
         rushShip,
         createdBy: { uid: 'user-id', name: 'Current User' }, // Replace with real user info if available
         items: selectedItems.map(item => ({
-          product: { id: item.product.id, name: item.product.name },
+          product: item.product,
           quantity: typeof item.quantity === 'string' ? 0 : item.quantity
         })),
       };
@@ -365,64 +365,95 @@ export function CreateOrderDialog({
           ) : (
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="space-y-6">
-                {/* Customer Information Section */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pb-2 border-b">Customer Information</h3>
                   <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="customerName">Customer Name</Label>
-                      <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={comboboxOpen}
-                            className="w-full justify-between"
-                          >
-                            {customerName || "Select or create customer..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <Command>
-                            <CommandInput
-                              placeholder="Search or type new customer..."
-                              value={customerName}
-                              onValueChange={setCustomerName}
-                            />
-                            <CommandList>
-                              <CommandEmpty>No customer found. Type name to create.</CommandEmpty>
-                              <CommandGroup>
-                                {customers.map((customer) => (
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="customerName">Customer Name</Label>
+                        <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={comboboxOpen}
+                              className="w-full justify-between"
+                            >
+                              {customerName || "Walk In Customer"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                            <Command>
+                              <CommandInput
+                                placeholder="Search or type new customer..."
+                                onValueChange={(value) => {
+                                  if (value) {
+                                    setCustomerName(value);
+                                  }
+                                }}
+                              />
+                              <CommandList>
+                                <CommandEmpty>No customer found. Type name to create.</CommandEmpty>
+                                <CommandGroup>
                                   <CommandItem
-                                    key={customer.id}
-                                    value={customer.name}
-                                    onSelect={() => handleCustomerSelect(customer)}
+                                    value="Walk In Customer"
+                                    onSelect={() => {
+                                      setCustomerName("Walk In Customer");
+                                      setContactNumber("");
+                                      setAddress("");
+                                      setComboboxOpen(false);
+                                    }}
                                   >
                                     <Check
                                       className={cn(
                                         "mr-2 h-4 w-4",
-                                        customerName.toLowerCase() === customer.name.toLowerCase() ? "opacity-100" : "opacity-0"
+                                        customerName.toLowerCase() === "walk in customer" ? "opacity-100" : "opacity-0"
                                       )}
                                     />
-                                    {customer.name}
+                                    Walk In Customer
                                   </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-4">
+                                  {customers.map((customer) => (
+                                    <CommandItem
+                                      key={customer.id}
+                                      value={customer.name}
+                                      onSelect={() => handleCustomerSelect(customer)}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          customerName.toLowerCase() === customer.name.toLowerCase() ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {customer.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                       <div className="grid gap-2">
                         <Label htmlFor="contactNumber">Contact No.</Label>
-                        <Input id="contactNumber" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="09XX-XXX-XXXX" />
+                        <Input
+                          id="contactNumber"
+                          value={contactNumber}
+                          onChange={(e) => setContactNumber(e.target.value)}
+                          placeholder="09XX-XXX-XXXX"
+                          disabled={customerName === "Walk In Customer"}
+                        />
                       </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="address">Address</Label>
-                        <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, City, State" />
-                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="address">Address</Label>
+                      <Input
+                        id="address"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Street, City, State"
+                        disabled={customerName === "Walk In Customer"}
+                      />
                     </div>
                   </div>
                 </div>
@@ -491,7 +522,14 @@ export function CreateOrderDialog({
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="shippingFee">Shipping Fee</Label>
-                        <Input id="shippingFee" type="number" value={shippingFee} onChange={(e) => setShippingFee(e.target.value)} placeholder="0.00" disabled={isPickup} />
+                        <Input
+                          id="shippingFee"
+                          type="number"
+                          value={shippingFee}
+                          onChange={(e) => setShippingFee(e.target.value)}
+                          placeholder="0.00"
+                          disabled={isPickup || customerName === "Walk In Customer"}
+                        />
                       </div>
                       <div className="grid gap-2">
                         <Label>Total Amount</Label>
@@ -504,6 +542,7 @@ export function CreateOrderDialog({
                       <Select
                         value={rushShip ? "yes" : "no"}
                         onValueChange={(value) => setRushShip(value === "yes")}
+                        disabled={customerName === "Walk In Customer"}
                       >
                         <SelectTrigger id="rushShip-create">
                           <SelectValue placeholder="Select priority" />
@@ -530,6 +569,7 @@ export function CreateOrderDialog({
                             setSelectedStationId(value);
                           }
                         }}
+                        disabled={customerName === "Walk In Customer"}
                       >
                         <SelectTrigger id="pickup-station">
                           <SelectValue placeholder="Select delivery method" />
@@ -549,11 +589,23 @@ export function CreateOrderDialog({
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="courierName">Courier Name</Label>
-                        <Input id="courierName" value={courierName} onChange={(e) => setCourierName(e.target.value)} placeholder="Lalamove, J&T, etc." />
+                        <Input
+                          id="courierName"
+                          value={courierName}
+                          onChange={(e) => setCourierName(e.target.value)}
+                          placeholder="Lalamove, J&T, etc."
+                          disabled={customerName === "Walk In Customer"}
+                        />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="trackingNumber">Tracking Number</Label>
-                        <Input id="trackingNumber" value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="TRACKING-123" />
+                        <Input
+                          id="trackingNumber"
+                          value={trackingNumber}
+                          onChange={(e) => setTrackingNumber(e.target.value)}
+                          placeholder="TRACKING-123"
+                          disabled={customerName === "Walk In Customer"}
+                        />
                       </div>
                     </div>
 
@@ -576,7 +628,11 @@ export function CreateOrderDialog({
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="batchId">Delivery Batch</Label>
-                        <Select onValueChange={(value) => setBatchId(value)} value={batchId || ''}>
+                        <Select
+                          onValueChange={(value) => setBatchId(value)}
+                          value={batchId || ''}
+                          disabled={customerName === "Walk In Customer"}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select batch" />
                           </SelectTrigger>
@@ -588,7 +644,11 @@ export function CreateOrderDialog({
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="paymentMethod">Payment Method</Label>
-                        <Select onValueChange={(value: PaymentMethod) => setPaymentMethod(value)} value={paymentMethod}>
+                        <Select
+                          onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}
+                          value={paymentMethod}
+                          disabled={customerName === "Walk In Customer"}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select method" />
                           </SelectTrigger>
@@ -605,7 +665,11 @@ export function CreateOrderDialog({
                     <div className="grid md:grid-cols-2 gap-4 pb-4">
                       <div className="grid gap-2">
                         <Label htmlFor="paymentStatus">Payment Status</Label>
-                        <Select onValueChange={(value: PaymentStatus) => setPaymentStatus(value)} value={paymentStatus} disabled={batchId === 'hold'}>
+                        <Select
+                          onValueChange={(value: PaymentStatus) => setPaymentStatus(value)}
+                          value={paymentStatus}
+                          disabled={batchId === 'hold' || customerName === "Walk In Customer"}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
@@ -620,7 +684,11 @@ export function CreateOrderDialog({
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="shippingStatus">Shipping Status</Label>
-                        <Select onValueChange={(value: ShippingStatus) => setShippingStatus(value)} value={shippingStatus}>
+                        <Select
+                          onValueChange={(value: ShippingStatus) => setShippingStatus(value)}
+                          value={shippingStatus}
+                          disabled={customerName === "Walk In Customer"}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>

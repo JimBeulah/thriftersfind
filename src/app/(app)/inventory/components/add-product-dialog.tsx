@@ -43,8 +43,6 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
   const [description, setDescription] = useState("");
   const [baseSku, setBaseSku] = useState(() => String.fromCharCode(65 + Math.floor(Math.random() * 26)) + "-" + Math.floor(Math.random() * 100).toString().padStart(2, '0'));
   const [branch1Qty, setBranch1Qty] = useState("0");
-  const [branch2Qty, setBranch2Qty] = useState("0");
-  const [warehouseQty, setWarehouseQty] = useState("0");
   const [cost, setCost] = useState("0.00");
   const [retailPrice, setRetailPrice] = useState("0.00");
   const [alertStock, setAlertStock] = useState("0");
@@ -76,8 +74,6 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
     setBaseSku(String.fromCharCode(65 + Math.floor(Math.random() * 26)) + "-" + Math.floor(Math.random() * 100).toString().padStart(2, '0'));
     setDescription("");
     setBranch1Qty("0");
-    setBranch2Qty("0");
-    setWarehouseQty("0");
     setCost("0.00");
     setRetailPrice("0.00");
     setAlertStock("0");
@@ -108,8 +104,6 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
     if (!cost || parseFloat(cost) <= 0) missingFields.push("Cost");
     if (!retailPrice || parseFloat(retailPrice) <= 0) missingFields.push("Retail Price");
     if (!branch1Qty && branch1Qty !== "0") missingFields.push("Branch 1 Qty");
-    if (!branch2Qty && branch2Qty !== "0") missingFields.push("Branch 2 Qty");
-    if (!warehouseQty && warehouseQty !== "0") missingFields.push("Warehouse Qty");
     if (!alertStock && alertStock !== "0") missingFields.push("Alert Stock");
     if (images.length === 0) missingFields.push("Product Images");
 
@@ -143,8 +137,7 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
         sku,
         description,
         branch1: parseInt(branch1Qty) || 0,
-        branch2: parseInt(branch2Qty) || 0,
-        warehouse: parseInt(warehouseQty) || 0,
+        branch2: 0, // No longer used in UI, set to 0
         alertStock: parseInt(alertStock) || 0,
         cost: parseFloat(cost) || 0,
         retailPrice: parseFloat(retailPrice) || 0,
@@ -221,24 +214,17 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
             <Label htmlFor="description">Description</Label>
             <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <div className="grid gap-2">
-            <Label>Quantity (QTY)</Label>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="branch1Qty" className="text-xs">Branch 1</Label>
-                <Input id="branch1Qty" type="number" value={branch1Qty} onChange={(e) => setBranch1Qty(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="branch2Qty" className="text-xs">Branch 2</Label>
-                <Input id="branch2Qty" type="number" value={branch2Qty} onChange={(e) => setBranch2Qty(e.target.value)} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="warehouseQty" className="text-xs">Warehouse</Label>
-                <Input id="warehouseQty" type="number" value={warehouseQty} onChange={(e) => setWarehouseQty(e.target.value)} />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="branch1Qty">Branch 1 Quantity</Label>
+              <Input id="branch1Qty" type="number" value={branch1Qty} onChange={(e) => setBranch1Qty(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="alertStock">Alert Stock</Label>
+              <Input id="alertStock" type="number" value={alertStock} onChange={(e) => setAlertStock(e.target.value)} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="cost">Cost (PHP)</Label>
               <Input id="cost" type="number" value={cost} onChange={(e) => setCost(e.target.value)} />
@@ -246,10 +232,6 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
             <div className="grid gap-2">
               <Label htmlFor="retailPrice">Retail Price (PHP)</Label>
               <Input id="retailPrice" type="number" value={retailPrice} onChange={(e) => setRetailPrice(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="alertStock">Alert Stock</Label>
-              <Input id="alertStock" type="number" value={alertStock} onChange={(e) => setAlertStock(e.target.value)} />
             </div>
           </div>
           <div className="grid gap-2">

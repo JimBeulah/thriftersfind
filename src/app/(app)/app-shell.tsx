@@ -15,6 +15,7 @@ import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/nav-links";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserNav } from "@/components/user-nav";
+import { MessengerNav } from "@/components/messenger-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import Breadcrumbs from "@/components/breadcrumbs";
 import { User } from "@/lib/types";
@@ -45,6 +46,7 @@ export function AppShell({ children, user }: AppShellProps) {
                     <div className="flex-1">
                         <Breadcrumbs />
                     </div>
+                    <MessengerNav />
                     <NotificationBell />
                     <ThemeToggle />
                     <UserNav user={user} />

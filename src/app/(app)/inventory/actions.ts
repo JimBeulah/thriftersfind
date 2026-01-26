@@ -34,8 +34,8 @@ export async function getProducts(): Promise<Product[]> {
       description: product.description || "",
       branch1: typeof product.branch1 === 'number' ? product.branch1 : 0,
       branch2: typeof product.branch2 === 'number' ? product.branch2 : 0,
-      warehouse: typeof product.warehouse === 'number' ? product.warehouse : 0,
-      totalStock: (product.branch1 || 0) + (product.branch2 || 0) + (product.warehouse || 0),
+      warehouseId: (product as any).warehouseId || null,
+      totalStock: (product.branch1 || 0) + (product.branch2 || 0),
       alertStock: typeof product.alertStock === 'number' ? product.alertStock : 0,
       cost: typeof product.cost === 'number' ? product.cost : 0,
       retailPrice: typeof product.retailPrice === 'number' ? product.retailPrice : 0,
@@ -66,20 +66,22 @@ export async function createProduct(productData: Omit<Product, 'id' | 'totalStoc
       throw new Error(`Product with SKU "${productData.sku}" already exists`);
     }
 
-    const totalStock = (productData.branch1 || 0) + (productData.branch2 || 0) + (productData.warehouse || 0);
+    // Set branch2 to 0 as it is no longer used in the UI
+    const branch2 = 0;
+    const totalStock = (productData.branch1 || 0) + branch2;
     const id = `c${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
 
     // Use raw query to bypass outdated Prisma client validation for batchId and createdBy
     await prisma.$executeRawUnsafe(
-      `INSERT INTO products (id, name, sku, description, branch1, branch2, warehouse, alertStock, cost, retailPrice, images, batchId, createdBy, createdAt, updatedAt) 
+      `INSERT INTO products (id, name, sku, description, branch1, branch2, warehouseId, alertStock, cost, retailPrice, images, batchId, createdBy, createdAt, updatedAt) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
       id,
       productData.name,
       productData.sku,
       productData.description || null,
       productData.branch1 || 0,
-      productData.branch2 || 0,
-      productData.warehouse || 0,
+      branch2,
+      productData.warehouseId || null,
       productData.alertStock || 0,
       productData.cost || 0,
       productData.retailPrice || 0,
@@ -94,8 +96,8 @@ export async function createProduct(productData: Omit<Product, 'id' | 'totalStoc
       sku: productData.sku,
       description: productData.description || "",
       branch1: productData.branch1 || 0,
-      branch2: productData.branch2 || 0,
-      warehouse: productData.warehouse || 0,
+      branch2: branch2,
+      warehouseId: productData.warehouseId || null,
       totalStock: totalStock,
       alertStock: productData.alertStock || 0,
       cost: productData.cost || 0,
@@ -147,7 +149,7 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
     if (productData.description !== undefined) { updates.push("description = ?"); values.push(productData.description); }
     if (productData.branch1 !== undefined) { updates.push("branch1 = ?"); values.push(productData.branch1); }
     if (productData.branch2 !== undefined) { updates.push("branch2 = ?"); values.push(productData.branch2); }
-    if (productData.warehouse !== undefined) { updates.push("warehouse = ?"); values.push(productData.warehouse); }
+    if (productData.warehouseId !== undefined) { updates.push("warehouseId = ?"); values.push(productData.warehouseId); }
     if (productData.alertStock !== undefined) { updates.push("alertStock = ?"); values.push(productData.alertStock); }
     if (productData.cost !== undefined) { updates.push("cost = ?"); values.push(productData.cost); }
     if (productData.retailPrice !== undefined) { updates.push("retailPrice = ?"); values.push(productData.retailPrice); }
@@ -173,8 +175,8 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
       description: updatedProduct.description || "",
       branch1: updatedProduct.branch1,
       branch2: updatedProduct.branch2,
-      warehouse: updatedProduct.warehouse,
-      totalStock: updatedProduct.branch1 + updatedProduct.branch2 + updatedProduct.warehouse,
+      warehouseId: (updatedProduct as any).warehouseId,
+      totalStock: updatedProduct.branch1 + updatedProduct.branch2,
       alertStock: updatedProduct.alertStock,
       cost: updatedProduct.cost,
       retailPrice: updatedProduct.retailPrice || 0,

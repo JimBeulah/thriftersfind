@@ -1,9 +1,6 @@
-
-import { getOrders } from "../../orders/actions";
+import { getPreOrders, getPreOrderProducts } from "../actions";
 import { getCustomers } from "../../customers/actions";
-import { getProducts } from "../../inventory/actions";
 import { getStations } from "../../stations/actions";
-import { getBatches } from "../../batches/actions";
 import PreOrderTable from "../components/pre-order-table";
 
 export const metadata = {
@@ -12,15 +9,10 @@ export const metadata = {
 };
 
 export default async function PreOrdersPage() {
-    const orders = await getOrders();
+    const preOrders = await getPreOrders();
     const customers = await getCustomers();
-    const products = await getProducts();
+    const products = await getPreOrderProducts();
     const stations = await getStations();
-    const batches = await getBatches();
-
-    // For now, render all orders. In a real scenario, we might would filter for checks like `status === 'Pre-order'`
-    // but since we are just laying out the page, we pass all data.
-    // Maybe user considers "Open" batches as pre-orders? 
 
     return (
         <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -34,11 +26,10 @@ export default async function PreOrdersPage() {
             </div>
 
             <PreOrderTable
-                orders={orders}
+                orders={preOrders}
                 customers={customers}
                 products={products}
                 stations={stations}
-                batches={batches}
             />
         </div>
     );

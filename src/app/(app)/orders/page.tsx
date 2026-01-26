@@ -4,12 +4,14 @@ import { getOrders } from "./actions";
 import { getCustomers } from "../customers/actions";
 import { getProducts } from "../inventory/actions";
 import { getStations } from "../stations/actions";
+import { getBatches } from "../batches/actions";
 
 export default async function OrdersPage() {
   const orders = await getOrders();
   const customers = await getCustomers();
   const products = await getProducts();
   const stations = await getStations();
+  const batches = await getBatches();
 
   return (
     <div className="flex flex-col gap-8">
@@ -21,6 +23,7 @@ export default async function OrdersPage() {
         customers={customers}
         products={products}
         stations={stations}
+        batches={batches}
       />
     </div>
   );

@@ -1,12 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Product, Batch } from "@/lib/types";
+// import { Product, Batch } from "@/lib/types"; // No longer using Product
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, AlertCircle, Package } from "lucide-react";
+import { Search, MoreHorizontal, Image as ImageIcon, X, AlertTriangle, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+
 import {
     Table,
     TableBody,
@@ -16,16 +19,56 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+// import { deleteProduct } from "@/app/(app)/inventory/actions"; // Use local delete action if it exists or create one?
+// For now, I will use a placeholder delete since I haven't created deletePreOrderProduct
+import { useToast } from "@/hooks/use-toast";
+import { AddPreOrderProductDialog } from "./add-pre-order-product-dialog";
 
-interface PreOrderInventoryGridProps {
-    products: Product[];
-    batches: Batch[];
+// Define PreOrderProduct type locally to match Schema
+interface PreOrderProduct {
+    id: string;
+    name: string;
+    sku: string;
+    description: string | null;
+    quantity: number;
+    alertStock: number;
+    cost: number;
+    retailPrice: number | null;
+    images: any; // Json type in Prisma
+    createdAt: Date;
+    updatedAt: Date;
 }
 
-export default function PreOrderInventoryGrid({ products, batches }: PreOrderInventoryGridProps) {
+interface PreOrderInventoryGridProps {
+    products: PreOrderProduct[];
+}
+
+export default function PreOrderInventoryGrid({ products }: PreOrderInventoryGridProps) {
+    const router = useRouter();
+    const { toast } = useToast();
     const [searchTerm, setSearchTerm] = React.useState("");
-    const [batchFilter, setBatchFilter] = React.useState<string>("all");
     const [stockFilter, setStockFilter] = React.useState<string>("all");
+    const [isAddProductOpen, setIsAddProductOpen] = React.useState(false);
+
+    // const [editingProduct, setEditingProduct] = React.useState<PreOrderProduct | null>(null);
 
     const filteredProducts = React.useMemo(() => {
         return products.filter((product) => {
@@ -33,28 +76,34 @@ export default function PreOrderInventoryGrid({ products, batches }: PreOrderInv
                 product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 product.sku.toLowerCase().includes(searchTerm.toLowerCase());
 
-            const matchesBatch = batchFilter === "all" || product.batchId === batchFilter;
-
-            const totalStock = (product.branch1 || 0) + (product.branch2 || 0) + (product.warehouse || 0);
+            const quantity = product.quantity || 0;
             let matchesStock = true;
             if (stockFilter === "low") {
-                matchesStock = totalStock > 0 && totalStock <= product.alertStock;
+                matchesStock = quantity > 0 && quantity <= product.alertStock;
             } else if (stockFilter === "out") {
-                matchesStock = totalStock === 0;
+                matchesStock = quantity === 0;
             } else if (stockFilter === "available") {
-                matchesStock = totalStock > product.alertStock;
+                matchesStock = quantity > product.alertStock;
             }
 
-            return matchesSearch && matchesBatch && matchesStock;
+            return matchesSearch && matchesStock;
         });
-    }, [products, searchTerm, batchFilter, stockFilter]);
+    }, [products, searchTerm, stockFilter]);
 
-    const getStockStatus = (product: Product) => {
-        const totalStock = (product.branch1 || 0) + (product.branch2 || 0) + (product.warehouse || 0);
-        if (totalStock === 0) return { label: "Out of Stock", color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300" };
-        if (totalStock <= product.alertStock) return { label: "Low Stock", color: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300" };
-        return { label: "In Stock", color: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300" };
+    const getStockStatus = (product: PreOrderProduct) => {
+        const quantity = product.quantity || 0;
+        if (quantity === 0) return { label: "Out of Stock", variant: "destructive" as const, icon: X };
+        if (quantity <= product.alertStock) return { label: "Low Stock", variant: "destructive" as const, icon: AlertTriangle };
+        return { label: "In Stock", variant: "secondary" as const, icon: null };
     };
+
+    const handleDelete = async (productId: string) => {
+        // Implement delete later
+        toast({
+            title: "Not Implemented",
+            description: "Delete functionality for Pre-Order products is coming soon.",
+        });
+    }
 
     return (
         <div className="space-y-6">
@@ -71,16 +120,6 @@ export default function PreOrderInventoryGrid({ products, batches }: PreOrderInv
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <Select value={batchFilter} onValueChange={setBatchFilter}>
-                        <SelectTrigger className="w-full sm:w-[180px]">
-                            <SelectValue placeholder="Filter by batch" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Batches</SelectItem>
-                            {batches?.map(b => <SelectItem key={b.id} value={b.id}>{b.batchName}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-
                     <Select value={stockFilter} onValueChange={setStockFilter}>
                         <SelectTrigger className="w-full sm:w-[180px]">
                             <SelectValue placeholder="Stock status" />
@@ -93,6 +132,11 @@ export default function PreOrderInventoryGrid({ products, batches }: PreOrderInv
                         </SelectContent>
                     </Select>
                 </div>
+
+                <Button onClick={() => setIsAddProductOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Product
+                </Button>
             </div>
 
             {/* Product Table */}
@@ -101,23 +145,26 @@ export default function PreOrderInventoryGrid({ products, batches }: PreOrderInv
                     <Table>
                         <TableHeader className="bg-zinc-50 dark:bg-zinc-900/50">
                             <TableRow className="hover:bg-transparent">
-                                <TableHead className="w-[250px]">Product</TableHead>
+                                <TableHead className="w-[80px]">Image</TableHead>
+                                <TableHead className="w-[200px]">Product</TableHead>
                                 <TableHead>SKU</TableHead>
-                                <TableHead>Batch</TableHead>
-                                <TableHead className="text-center">Branch 1</TableHead>
-                                <TableHead className="text-center">Branch 2</TableHead>
-                                <TableHead className="text-center">Warehouse</TableHead>
                                 <TableHead className="text-center">Total Stock</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Retail Price</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
+                                <TableHead>
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             <AnimatePresence mode="popLayout">
                                 {filteredProducts.length > 0 ? (
                                     filteredProducts.map((product) => {
-                                        const totalStock = (product.branch1 || 0) + (product.branch2 || 0) + (product.warehouse || 0);
                                         const status = getStockStatus(product);
-                                        const batch = batches.find(b => b.id === product.batchId);
+                                        const StatusIcon = status.icon;
+
+                                        // Handle images safely
+                                        const imageUrl = Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : null;
 
                                         return (
                                             <motion.tr
@@ -129,48 +176,71 @@ export default function PreOrderInventoryGrid({ products, batches }: PreOrderInv
                                                 transition={{ duration: 0.2 }}
                                                 className="border-b transition-colors hover:bg-muted/50"
                                             >
+                                                <TableCell>
+                                                    <Avatar className="h-10 w-10 rounded-md">
+                                                        <AvatarImage src={imageUrl} alt={product.name} />
+                                                        <AvatarFallback className="rounded-md bg-muted">
+                                                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                </TableCell>
                                                 <TableCell className="font-medium">
                                                     <div className="flex items-center gap-2">
-                                                        <Package className="h-4 w-4 text-primary flex-shrink-0" />
                                                         <span className="line-clamp-2">{product.name}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="font-mono text-sm text-muted-foreground">
                                                     {product.sku}
                                                 </TableCell>
-                                                <TableCell>
-                                                    {batch ? (
-                                                        <span className="text-sm">{batch.batchName}</span>
-                                                    ) : (
-                                                        <span className="text-sm text-muted-foreground italic">Unassigned</span>
-                                                    )}
+                                                <TableCell className="text-center">
+                                                    <span className="font-bold tabular-nums">{product.quantity}</span>
                                                 </TableCell>
-                                                <TableCell className="text-center tabular-nums">
-                                                    {product.branch1 || 0}
-                                                </TableCell>
-                                                <TableCell className="text-center tabular-nums">
-                                                    {product.branch2 || 0}
-                                                </TableCell>
-                                                <TableCell className="text-center tabular-nums">
-                                                    {product.warehouse || 0}
+                                                <TableCell className="text-right tabular-nums">
+                                                    ₱{product.retailPrice?.toFixed(2) || "0.00"}
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    <span className="font-bold tabular-nums">{totalStock}</span>
-                                                    {totalStock <= product.alertStock && totalStock > 0 && (
-                                                        <AlertCircle className="inline-block ml-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline" className={status.color}>
+                                                    <Badge variant={status.variant} className="flex items-center justify-center gap-1 w-fit mx-auto">
+                                                        {StatusIcon && <StatusIcon className="h-3 w-3" />}
                                                         {status.label}
                                                     </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <AlertDialog>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                    <span className="sr-only">Toggle menu</span>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                {/* <DropdownMenuItem onClick={() => setEditingProduct(product)}>Edit</DropdownMenuItem> */}
+                                                                <AlertDialogTrigger asChild>
+                                                                    <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
+                                                                </AlertDialogTrigger>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    This action cannot be undone. This will permanently delete the product
+                                                                    from the inventory.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDelete(product.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
                                                 </TableCell>
                                             </motion.tr>
                                         );
                                     })
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                                             No products found.
                                         </TableCell>
                                     </TableRow>
@@ -184,6 +254,15 @@ export default function PreOrderInventoryGrid({ products, batches }: PreOrderInv
             <div className="text-xs text-center text-muted-foreground">
                 Showing {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
             </div>
+
+            <AddPreOrderProductDialog
+                isOpen={isAddProductOpen}
+                onClose={() => setIsAddProductOpen(false)}
+                onSuccess={() => {
+                    setIsAddProductOpen(false);
+                    router.refresh();
+                }}
+            />
         </div>
     );
 }

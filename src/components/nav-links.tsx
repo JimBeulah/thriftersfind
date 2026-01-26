@@ -22,6 +22,7 @@ import {
   Shield,
   Computer,
   CalendarClock,
+  Warehouse,
 } from "lucide-react";
 import {
   SidebarMenu,
@@ -73,23 +74,12 @@ const links = [
     icon: <MapPin />,
     permission: "stations",
   },
+
   {
-    href: "/users",
-    label: "Users",
-    icon: <ShieldCheck />,
-    permission: "users",
-  },
-  {
-    href: "/reports",
-    label: "Reports",
-    icon: <LineChart />,
-    permission: "reports",
-  },
-  {
-    href: "/sales",
-    label: "Sales",
-    icon: <DollarSign />,
-    permission: "reports", // map sales to reports for now? or maybe it needs 'sales' permission? defaulting to reports.
+    href: "/warehouses",
+    label: "Warehouses",
+    icon: <Warehouse />,
+    permission: "stations", // Using same permission as stations for now
   },
 
   {
@@ -97,6 +87,27 @@ const links = [
     label: "Pre orders",
     icon: <ShoppingCart />,
     permission: "preOrders",
+  },
+
+  {
+    href: "/reports",
+    label: "Reports",
+    icon: <LineChart />,
+    permission: "reports",
+  },
+
+  {
+    href: "/sales",
+    label: "Sales",
+    icon: <DollarSign />,
+    permission: "reports",
+  },
+
+  {
+    href: "/users",
+    label: "Users",
+    icon: <ShieldCheck />,
+    permission: "users",
   },
 
   {
@@ -292,6 +303,8 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
           </SidebarMenuItem>
         );
       })}
+
+
 
       {/* Admin Manage Section - Only visible for Super Admin */}
       {/* Admin Manage Section - Only visible users with adminManage permission */}

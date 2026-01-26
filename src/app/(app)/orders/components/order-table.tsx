@@ -82,9 +82,10 @@ interface OrderTableProps {
   customers: Customer[];
   products: Product[];
   stations: Station[];
+  batches: Batch[];
 }
 
-export default function OrderTable({ orders, customers, products, stations }: OrderTableProps) {
+export default function OrderTable({ orders, customers, products, stations, batches }: OrderTableProps) {
   const router = useRouter();
   const [filteredOrders, setFilteredOrders] = React.useState<Order[]>(orders);
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -105,12 +106,6 @@ export default function OrderTable({ orders, customers, products, stations }: Or
   const [orderForSms, setOrderForSms] = React.useState<Order | null>(null);
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = React.useState<string | null>(null);
-
-  // Mock batches data
-  const allBatches: Batch[] = [
-    { id: 'batch1', batchName: 'Batch 1', deliveryDate: '2024-01-15', cutoffDate: '2024-01-14', status: 'Open', totalOrders: 10, totalSales: 5000 },
-    { id: 'batch2', batchName: 'Batch 2', deliveryDate: '2024-01-22', cutoffDate: '2024-01-21', status: 'Closed', totalOrders: 15, totalSales: 7500 },
-  ];
 
   React.useEffect(() => {
     let newFilteredOrders = orders;
@@ -246,7 +241,7 @@ export default function OrderTable({ orders, customers, products, stations }: Or
               <SelectContent>
                 <SelectItem value="all">All Batches</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
-                {allBatches?.map(b => <SelectItem key={b.id} value={b.id}>{b.batchName}</SelectItem>)}
+                {batches?.map(b => <SelectItem key={b.id} value={b.id}>{b.batchName}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>

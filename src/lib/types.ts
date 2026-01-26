@@ -135,7 +135,7 @@ export type Product = {
   description: string;
   branch1: number;
   branch2: number;
-  warehouse: number;
+  warehouseId?: string | null;
   totalStock: number;
   alertStock: number;
   cost: number;
@@ -143,6 +143,21 @@ export type Product = {
   images: string[];
   batchId?: string | null;
 }
+
+export type PreOrderProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  description: string | null;
+  quantity: number;
+  alertStock: number;
+  cost: number;
+  retailPrice: number | null;
+  images: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 export type Station = {
   id: string;
@@ -153,4 +168,37 @@ export type Station = {
   latitude?: number | null;
   longitude?: number | null;
   isActive: boolean;
+};
+
+export type PreOrder = {
+  id: string;
+  customerName: string;
+  contactNumber: string | null;
+  address: string | null;
+  orderDate: Date | string | null;
+  totalAmount: number;
+  paymentMethod: string | null;
+  paymentStatus: string | null;
+  depositAmount: number | null;
+  customerId: string;
+  customerEmail: string | null;
+  remarks: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  customer?: Customer;
+  items: PreOrderItem[];
+  salesLogs?: any[];
+};
+
+export type PreOrderItem = {
+  id: string;
+  preOrderId: string;
+  preOrderProductId: string;
+  productName: string;
+  quantity: number;
+  pricePerUnit: number;
+  totalPrice: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  product?: PreOrderProduct;
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Order, PaymentStatus, ShippingStatus, Customer, Product, Station, Batch } from "@/lib/types";
+import { Order, PaymentStatus, ShippingStatus, Customer, Product, Station, Batch, PreOrderProduct, PreOrder } from "@/lib/types";
 import {
     Table,
     TableBody,
@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ShoppingBag, Truck, Calendar, Filter, Archive, User, Package, PlusCircle } from "lucide-react";
+import { Search, ShoppingBag, Truck, Calendar, Filter, Archive, User, Package, PlusCircle, CircleDollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -22,11 +22,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CreatePreOrderDialog } from "./create-pre-order-dialog";
 
 interface PreOrderTableProps {
-    orders: Order[];
+    orders: PreOrder[];
     customers: Customer[];
-    products: Product[];
+    products: PreOrderProduct[];
     stations: Station[];
-    batches: Batch[];
 }
 
 const statusBadgeStyles: Record<ShippingStatus, string> = {
@@ -39,9 +38,13 @@ const statusBadgeStyles: Record<ShippingStatus, string> = {
     "Rush Ship": "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300",
 };
 
-export default function PreOrderTable({ orders, customers, products, stations, batches }: PreOrderTableProps) {
+// Mock payment statuses for the filter UI - in real app this would likely be on the Order object
+const PAYMENT_STATUSES = ["TO PAY", "DOWNPAYMENT", "PAID"];
+
+export default function PreOrderTable({ orders, customers, products, stations }: PreOrderTableProps) {
     const [searchTerm, setSearchTerm] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState<string>("all");
+    const [paymentStatusFilter, setPaymentStatusFilter] = React.useState<string>("all");
     const [isCreateDialogOpen, setCreateDialogOpen] = React.useState(false);
 
     const filteredOrders = React.useMemo(() => {
@@ -49,14 +52,22 @@ export default function PreOrderTable({ orders, customers, products, stations, b
             const matchesSearch =
                 order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                order.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (order.batch?.batchName || "").toLowerCase().includes(searchTerm.toLowerCase());
+                order.items.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                order.paymentMethod?.toLowerCase().includes(searchTerm.toLowerCase());
 
-            const matchesStatus = statusFilter === "all" || order.shippingStatus === statusFilter;
+            // For now status filter will be simple or mocked if not present in PreOrder directly
+            // PreOrder doesn't have shippingStatus yet, maybe use paymentStatus as proxy or add it later.
+            // Keeping logic simple for now.
+            const matchesStatus = statusFilter === "all"; // || order.status === statusFilter;
 
-            return matchesSearch && matchesStatus;
+            const matchesPaymentStatus = paymentStatusFilter === "all" ||
+                (paymentStatusFilter === "PAID" && order.paymentStatus === "Paid") ||
+                (paymentStatusFilter === "TO PAY" && order.paymentStatus === "Unpaid") ||
+                (paymentStatusFilter === "DOWNPAYMENT" && order.paymentStatus === "Partial");
+
+            return matchesSearch && matchesStatus && matchesPaymentStatus;
         });
-    }, [orders, searchTerm, statusFilter]);
+    }, [orders, searchTerm, statusFilter, paymentStatusFilter]);
 
     const getInitials = (name: string) => {
         return name
@@ -69,20 +80,36 @@ export default function PreOrderTable({ orders, customers, products, stations, b
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white dark:bg-zinc-950 p-4 rounded-xl shadow-sm border">
-                <div className="relative w-full sm:w-96">
+            <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-white dark:bg-zinc-950 p-4 rounded-xl shadow-sm border">
+                <div className="relative w-full xl:w-96">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         className="pl-9 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
-                        placeholder="Search orders, items, or batches..."
+                        placeholder="Search orders, items..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-full sm:w-[180px]">
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
+                    <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+                        <SelectTrigger className="w-full sm:w-[150px]">
+                            <div className="flex items-center gap-2">
+                                <CircleDollarSign className="h-4 w-4" />
+                                <SelectValue placeholder="Payment" />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Payments</SelectItem>
+                            {PAYMENT_STATUSES.map(status => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* Status Filter for future use */}
+                    <Select value={statusFilter} onValueChange={setStatusFilter} disabled>
+                        <SelectTrigger className="w-full sm:w-[150px]">
                             <div className="flex items-center gap-2">
                                 <Filter className="h-4 w-4" />
                                 <SelectValue placeholder="Status" />
@@ -90,10 +117,6 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="Ready">Ready</SelectItem>
-                            <SelectItem value="Shipped">Shipped</SelectItem>
-                            <SelectItem value="Rush Ship">Rush Ship</SelectItem>
                         </SelectContent>
                     </Select>
 
@@ -108,10 +131,11 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                 <Table>
                     <TableHeader className="bg-zinc-50 dark:bg-zinc-900/50">
                         <TableRow className="hover:bg-transparent">
-                            <TableHead className="w-[180px]">Item Details</TableHead>
-                            <TableHead className="w-[180px]">Batch Info</TableHead>
+                            <TableHead className="w-[250px]">Item Details</TableHead>
                             <TableHead>Customer</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead className="text-right text-green-600">Paid</TableHead>
+                            <TableHead className="text-right text-red-600">Bal</TableHead>
                             <TableHead className="text-right">Total</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
@@ -119,93 +143,97 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                     <TableBody>
                         <AnimatePresence mode="popLayout">
                             {filteredOrders.length > 0 ? (
-                                filteredOrders.map((order) => (
-                                    <motion.tr
-                                        key={order.id}
-                                        layout
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="group border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
-                                    >
-                                        {/* Item Details Column */}
-                                        <TableCell className="align-top py-4">
-                                            <div className="space-y-1">
-                                                <div className="font-medium flex items-center gap-2 text-foreground">
-                                                    <ShoppingBag className="h-3.5 w-3.5 text-primary" />
-                                                    <span className="line-clamp-1" title={order.itemName}>{order.itemName}</span>
-                                                </div>
-                                                <div className="text-xs text-muted-foreground pl-5.5">
-                                                    Qty: {order.quantity} • {order.id.substring(0, 8)}
-                                                </div>
-                                            </div>
-                                        </TableCell>
+                                filteredOrders.map((order) => {
+                                    // Use depositAmount from DB
+                                    const amountPaid = order.depositAmount || 0;
+                                    const remainingBalance = order.totalAmount - amountPaid;
 
-                                        {/* Batch Info Column - Unique to Pre-orders */}
-                                        <TableCell className="align-top py-4">
-                                            {order.batch ? (
+                                    return (
+                                        <motion.tr
+                                            key={order.id}
+                                            layout
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="group border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                                        >
+                                            {/* Item Details Column */}
+                                            <TableCell className="align-top py-4">
                                                 <div className="space-y-1">
-                                                    <div className="flex items-center gap-2 font-medium text-sm">
-                                                        <Package className="h-3.5 w-3.5 text-indigo-500" />
-                                                        {order.batch.batchName}
+                                                    {order.items.map((item) => (
+                                                        <div key={item.id} className="font-medium flex items-center gap-2 text-foreground">
+                                                            <ShoppingBag className="h-3.5 w-3.5 text-primary shrink-0" />
+                                                            <span className="line-clamp-1" title={item.productName}>
+                                                                {item.productName} (x{item.quantity})
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    <div className="text-xs text-muted-foreground pl-5.5 mt-1">
+                                                        {order.id.substring(0, 8)} • {format(new Date(order.createdAt), 'MMM dd, yyyy')}
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        Cutoff: {format(new Date(order.batch.cutoffDate), 'MMM d')}
+                                                </div>
+                                            </TableCell>
+
+                                            {/* Customer Column */}
+                                            <TableCell className="align-top py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-8 w-8 border">
+                                                        <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+                                                            {getInitials(order.customerName)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="grid gap-0.5">
+                                                        <span className="font-medium text-sm leading-none">{order.customerName}</span>
+                                                        <span className="text-xs text-muted-foreground font-mono">{order.paymentMethod}</span>
                                                     </div>
                                                 </div>
-                                            ) : (
-                                                <div className="text-xs text-muted-foreground italic flex items-center gap-2 h-full py-2">
-                                                    <Archive className="h-3.5 w-3.5" /> Unassigned
+                                            </TableCell>
+
+                                            {/* Status Column */}
+                                            <TableCell className="align-top py-4">
+                                                <div className="flex flex-col gap-1">
+                                                    {/* Placeholder for Shipping Status if later added to PreOrder */}
+                                                    <Badge variant="outline" className="font-normal w-fit bg-zinc-100 text-zinc-800 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300">
+                                                        Pending
+                                                    </Badge>
+
+                                                    <Badge variant="secondary" className="w-fit text-[10px]">
+                                                        {order.paymentStatus}
+                                                    </Badge>
                                                 </div>
-                                            )}
-                                        </TableCell>
+                                            </TableCell>
 
-                                        {/* Customer Column */}
-                                        <TableCell className="align-top py-4">
-                                            <div className="flex items-center gap-3">
-                                                <Avatar className="h-8 w-8 border">
-                                                    <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
-                                                        {getInitials(order.customerName)}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="grid gap-0.5">
-                                                    <span className="font-medium text-sm leading-none">{order.customerName}</span>
-                                                    <span className="text-xs text-muted-foreground font-mono">{order.paymentMethod}</span>
-                                                </div>
-                                            </div>
-                                        </TableCell>
+                                            {/* Total Column */}
+                                            <TableCell className="align-top text-right py-4 font-medium tabular-nums">
+                                                ₱{order.totalAmount.toLocaleString()}
+                                            </TableCell>
 
-                                        {/* Status Column */}
-                                        <TableCell className="align-top py-4">
-                                            <Badge variant="outline" className={`font-normal ${statusBadgeStyles[order.shippingStatus]}`}>
-                                                {order.shippingStatus}
-                                            </Badge>
-                                            {order.rushShip && (
-                                                <Badge variant="destructive" className="ml-2 text-[10px] h-5 px-1.5">Rush</Badge>
-                                            )}
-                                        </TableCell>
+                                            {/* Paid Column */}
+                                            <TableCell className="align-top text-right py-4 font-medium tabular-nums text-green-600">
+                                                ₱{amountPaid.toLocaleString()}
+                                            </TableCell>
 
-                                        {/* Total Column */}
-                                        <TableCell className="align-top text-right py-4 font-medium tabular-nums">
-                                            ₱{order.totalAmount.toLocaleString()}
-                                        </TableCell>
+                                            {/* Balance Column */}
+                                            <TableCell className="align-top text-right py-4 font-medium tabular-nums text-red-600">
+                                                ₱{remainingBalance.toLocaleString()}
+                                            </TableCell>
 
-                                        {/* Action Column */}
-                                        <TableCell className="align-top py-4">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <span className="sr-only">Menu</span>
-                                                <div className="bg-primary/20 p-1.5 rounded-md">
-                                                    <User className="h-4 w-4 text-primary" />
-                                                </div>
-                                            </Button>
-                                        </TableCell>
-                                    </motion.tr>
-                                ))
+                                            {/* Action Column */}
+                                            <TableCell className="align-top py-4">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <span className="sr-only">Menu</span>
+                                                    <div className="bg-primary/20 p-1.5 rounded-md">
+                                                        <User className="h-4 w-4 text-primary" />
+                                                    </div>
+                                                </Button>
+                                            </TableCell>
+                                        </motion.tr>
+                                    )
+                                })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                                         No pre-orders found.
                                     </TableCell>
                                 </TableRow>
@@ -215,7 +243,7 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                 </Table>
             </div>
             <div className="text-xs text-center text-muted-foreground">
-                Showing {filteredOrders.length} records • Data focuses on items and batch fulfillment.
+                Showing {filteredOrders.length} records.
             </div>
 
             <CreatePreOrderDialog
@@ -224,7 +252,7 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                 customers={customers}
                 products={products}
                 stations={stations}
-                batches={batches}
+
             />
         </div>
     );
