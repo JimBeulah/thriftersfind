@@ -28,10 +28,8 @@ export async function getBodegaProducts(): Promise<Product[]> {
             name: product.name,
             sku: product.sku,
             description: product.description || "",
-            branch1: typeof product.branch1 === 'number' ? product.branch1 : 0,
-            branch2: typeof product.branch2 === 'number' ? product.branch2 : 0,
-            warehouse: typeof product.warehouse === 'number' ? product.warehouse : 0,
-            totalStock: (product.branch1 || 0) + (product.branch2 || 0) + (product.warehouse || 0),
+            quantity: product.quantity,
+            totalStock: product.quantity,
             alertStock: typeof product.alertStock === 'number' ? product.alertStock : 0,
             cost: typeof product.cost === 'number' ? product.cost : 0,
             retailPrice: typeof product.retailPrice === 'number' ? product.retailPrice : 0,
@@ -71,20 +69,18 @@ export async function createBodegaProduct(productData: Omit<Product, 'id' | 'tot
         // Set branch2 and warehouse to 0 as they are no longer used in the UI
         const branch2 = 0;
         const warehouse = 0;
-        const totalStock = (productData.branch1 || 0) + branch2 + warehouse;
+        const totalStock = (productData.quantity || 0);
         const id = `c${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
 
         // Use raw query to bypass outdated Prisma client validation for batchId and createdBy
         await prisma.$executeRawUnsafe(
-            `INSERT INTO products (id, name, sku, description, branch1, branch2, warehouse, alertStock, cost, retailPrice, images, batchId, createdBy, createdAt, updatedAt) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
+            `INSERT INTO products (id, name, sku, description, quantity, alertStock, cost, retailPrice, images, batchId, createdBy, createdAt, updatedAt) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
             id,
             productData.name,
             productData.sku,
             productData.description || null,
-            productData.branch1 || 0,
-            branch2,
-            warehouse,
+            productData.quantity || 0,
             productData.alertStock || 0,
             productData.cost || 0,
             productData.retailPrice || 0,
@@ -98,9 +94,7 @@ export async function createBodegaProduct(productData: Omit<Product, 'id' | 'tot
             name: productData.name,
             sku: productData.sku,
             description: productData.description || "",
-            branch1: productData.branch1 || 0,
-            branch2: branch2,
-            warehouse: warehouse,
+            quantity: productData.quantity || 0,
             totalStock: totalStock,
             alertStock: productData.alertStock || 0,
             cost: productData.cost || 0,
@@ -157,9 +151,7 @@ export async function updateBodegaProduct(id: string, productData: Partial<Omit<
         if (productData.name !== undefined) { updates.push("name = ?"); values.push(productData.name); }
         if (productData.sku !== undefined) { updates.push("sku = ?"); values.push(productData.sku); }
         if (productData.description !== undefined) { updates.push("description = ?"); values.push(productData.description); }
-        if (productData.branch1 !== undefined) { updates.push("branch1 = ?"); values.push(productData.branch1); }
-        if (productData.branch2 !== undefined) { updates.push("branch2 = ?"); values.push(productData.branch2); }
-        if (productData.warehouse !== undefined) { updates.push("warehouse = ?"); values.push(productData.warehouse); }
+        if (productData.quantity !== undefined) { updates.push("quantity = ?"); values.push(productData.quantity); }
         if (productData.alertStock !== undefined) { updates.push("alertStock = ?"); values.push(productData.alertStock); }
         if (productData.cost !== undefined) { updates.push("cost = ?"); values.push(productData.cost); }
         if (productData.retailPrice !== undefined) { updates.push("retailPrice = ?"); values.push(productData.retailPrice); }
@@ -178,20 +170,21 @@ export async function updateBodegaProduct(id: string, productData: Partial<Omit<
 
         if (!updatedProduct) throw new Error("Failed to retrieve updated product");
 
+        // Cast to any to access quantity before client regen
+        const prod = updatedProduct as any;
+
         return {
-            id: updatedProduct.id,
-            name: updatedProduct.name,
-            sku: updatedProduct.sku,
-            description: updatedProduct.description || "",
-            branch1: updatedProduct.branch1,
-            branch2: updatedProduct.branch2,
-            warehouse: updatedProduct.warehouse,
-            totalStock: updatedProduct.branch1 + updatedProduct.branch2 + updatedProduct.warehouse,
-            alertStock: updatedProduct.alertStock,
-            cost: updatedProduct.cost,
-            retailPrice: updatedProduct.retailPrice || 0,
-            images: Array.isArray(updatedProduct.images) ? (updatedProduct.images as unknown as string[]) : [],
-            batchId: updatedProduct.batchId,
+            id: prod.id,
+            name: prod.name,
+            sku: prod.sku,
+            description: prod.description || "",
+            quantity: prod.quantity,
+            totalStock: prod.quantity,
+            alertStock: prod.alertStock,
+            cost: prod.cost,
+            retailPrice: prod.retailPrice || 0,
+            images: Array.isArray(prod.images) ? (prod.images as unknown as string[]) : [],
+            batchId: prod.batchId,
         };
     } catch (error) {
         console.error("Error in updateBodegaProduct:", error);

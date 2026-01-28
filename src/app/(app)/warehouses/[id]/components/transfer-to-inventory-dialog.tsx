@@ -35,7 +35,7 @@ interface TransferToInventoryDialogProps {
 export function TransferToInventoryDialog({ isOpen, onClose, product, onSuccess }: TransferToInventoryDialogProps) {
     const { toast } = useToast();
 
-    const [destination, setDestination] = useState<"branch1" | "branch2" | "warehouse">("branch1");
+    const [destination, setDestination] = useState<"quantity" | "warehouse">("quantity");
     const [quantity, setQuantity] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -59,7 +59,7 @@ export function TransferToInventoryDialog({ isOpen, onClose, product, onSuccess 
             if (result.success) {
                 toast({
                     title: "Transfer Successful",
-                    description: `${transferQty} units of "${product.productName}" transferred to ${destination === "branch1" ? "Branch 1" : destination === "branch2" ? "Branch 2" : "Warehouse"}.`,
+                    description: `${transferQty} units of "${product.productName}" transferred to ${destination === "quantity" ? "Main Inventory" : "Warehouse"}.`,
                 });
                 setQuantity("");
                 onClose();
@@ -116,8 +116,7 @@ export function TransferToInventoryDialog({ isOpen, onClose, product, onSuccess 
                                 <SelectValue placeholder="Select destination" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="branch1">Branch 1</SelectItem>
-                                <SelectItem value="branch2">Branch 2</SelectItem>
+                                <SelectItem value="quantity">Main Inventory</SelectItem>
                                 <SelectItem value="warehouse">Warehouse Inventory</SelectItem>
                             </SelectContent>
                         </Select>

@@ -423,6 +423,10 @@ export default function OrderTable({ orders, customers, products, stations, batc
         isOpen={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
         order={selectedOrder}
+        customers={customers}
+        products={products}
+        stations={stations}
+        batches={batches}
       />
 
       <ViewOrderDialog
@@ -437,6 +441,7 @@ export default function OrderTable({ orders, customers, products, stations, batc
         customers={customers}
         products={products}
         stations={stations}
+        batches={batches}
       />
 
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setCancelDialogOpen}>

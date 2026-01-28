@@ -79,7 +79,7 @@ const links = [
     href: "/warehouses",
     label: "Warehouses",
     icon: <Warehouse />,
-    permission: "stations", // Using same permission as stations for now
+    permission: "warehouses",
   },
 
   {

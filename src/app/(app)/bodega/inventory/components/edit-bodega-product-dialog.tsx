@@ -32,9 +32,7 @@ export function EditBodegaProductDialog({ isOpen, onClose, product, onSuccess }:
     const [name, setName] = useState("");
     const [sku, setSku] = useState("");
     const [description, setDescription] = useState("");
-    const [branch1Qty, setBranch1Qty] = useState("0");
-    const [branch2Qty, setBranch2Qty] = useState("0");
-    const [warehouseQty, setWarehouseQty] = useState("0");
+    const [quantity, setQuantity] = useState("0");
     const [cost, setCost] = useState("0.00");
     const [retailPrice, setRetailPrice] = useState("0.00");
     const [alertStock, setAlertStock] = useState("0");
@@ -50,9 +48,7 @@ export function EditBodegaProductDialog({ isOpen, onClose, product, onSuccess }:
             setName(product.name);
             setSku(product.sku);
             setDescription(product.description);
-            setBranch1Qty(String(product.branch1 || 0));
-            setBranch2Qty(String(product.branch2 || 0));
-            setWarehouseQty(String(product.warehouse || 0));
+            setQuantity(String(product.quantity || 0));
             setCost(String(product.cost));
             setRetailPrice(String(product.retailPrice || 0));
             setAlertStock(String(product.alertStock || 0));
@@ -120,9 +116,7 @@ export function EditBodegaProductDialog({ isOpen, onClose, product, onSuccess }:
                 name,
                 sku,
                 description,
-                branch1: parseInt(branch1Qty) || 0,
-                branch2: parseInt(branch2Qty) || 0,
-                warehouse: parseInt(warehouseQty) || 0,
+                quantity: parseInt(quantity) || 0,
                 alertStock: parseInt(alertStock) || 0,
                 cost: parseFloat(cost) || 0,
                 retailPrice: parseFloat(retailPrice) || 0,
@@ -175,20 +169,7 @@ export function EditBodegaProductDialog({ isOpen, onClose, product, onSuccess }:
                     </div>
                     <div className="grid gap-2">
                         <Label>Quantity (QTY)</Label>
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-branch1Qty" className="text-xs">Branch 1</Label>
-                                <Input id="edit-branch1Qty" type="number" value={branch1Qty} onChange={(e) => setBranch1Qty(e.target.value)} />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-branch2Qty" className="text-xs">Branch 2</Label>
-                                <Input id="edit-branch2Qty" type="number" value={branch2Qty} onChange={(e) => setBranch2Qty(e.target.value)} />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-warehouseQty" className="text-xs">Warehouse</Label>
-                                <Input id="edit-warehouseQty" type="number" value={warehouseQty} onChange={(e) => setWarehouseQty(e.target.value)} />
-                            </div>
-                        </div>
+                        <Input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                         <div className="grid gap-2">

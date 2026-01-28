@@ -14,6 +14,7 @@ export type UserPermissions = {
   adminManage: boolean;
   stations: boolean;
   preOrders: boolean;
+  warehouses: boolean;
 };
 
 export type User = {
@@ -133,8 +134,7 @@ export type Product = {
   name: string;
   sku: string;
   description: string;
-  branch1: number;
-  branch2: number;
+  quantity: number;
   warehouseId?: string | null;
   totalStock: number;
   alertStock: number;

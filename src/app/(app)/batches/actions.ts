@@ -44,8 +44,8 @@ export async function getBatches(): Promise<Batch[]> {
             deliveryDate: batch.deliveryDate.toISOString(),
             cutoffDate: batch.cutoffDate.toISOString(),
             status: batch.status as any,
-            totalOrders: batch._count.orders,
-            totalSales: batch.orders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0),
+            totalOrders: batch.totalOrders || 0,
+            totalSales: batch.totalSales || 0,
         }));
     } catch (error) {
         console.error("Error fetching batches:", error);

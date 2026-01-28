@@ -55,7 +55,7 @@ export function SelectProductDialog({ isOpen, onClose, onProductSelect, products
   );
 
   const getTotalQuantity = (product: Product) => {
-    return (product.branch1 || 0) + (product.branch2 || 0) + (product.warehouse || 0);
+    return product.quantity || 0;
   }
 
   const handleProductClick = (product: Product) => {

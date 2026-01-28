@@ -44,6 +44,7 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
   adminManage: false,
   stations: false,
   preOrders: false,
+  warehouses: false,
 };
 
 const PERMISSION_LABELS: Record<keyof UserPermissions, string> = {
@@ -58,6 +59,7 @@ const PERMISSION_LABELS: Record<keyof UserPermissions, string> = {
   adminManage: "Admin Manage",
   stations: "Courier & Pickup Stations",
   preOrders: "Pre order",
+  warehouses: "Warehouses",
 };
 
 export function CreateUserDialog({ isOpen, onClose, onUserAdded }: CreateUserDialogProps) {

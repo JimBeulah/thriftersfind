@@ -14,9 +14,8 @@ export async function getProducts(): Promise<Product[]> {
 
     const isSuperAdmin = user.role?.name === 'Super Admin';
 
-    const products = await prisma.product.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
+    // Use raw query to avoid schema validation errors with stale client
+    const products: any[] = await prisma.$queryRaw`SELECT * FROM products ORDER BY createdAt DESC`;
 
     // Filter products based on user role
     const filteredProducts = isSuperAdmin
@@ -32,10 +31,9 @@ export async function getProducts(): Promise<Product[]> {
       name: product.name,
       sku: product.sku,
       description: product.description || "",
-      branch1: typeof product.branch1 === 'number' ? product.branch1 : 0,
-      branch2: typeof product.branch2 === 'number' ? product.branch2 : 0,
+      quantity: typeof (product as any).quantity === 'number' ? (product as any).quantity : 0,
       warehouseId: (product as any).warehouseId || null,
-      totalStock: (product.branch1 || 0) + (product.branch2 || 0),
+      totalStock: ((product as any).quantity || 0),
       alertStock: typeof product.alertStock === 'number' ? product.alertStock : 0,
       cost: typeof product.cost === 'number' ? product.cost : 0,
       retailPrice: typeof product.retailPrice === 'number' ? product.retailPrice : 0,
@@ -57,30 +55,27 @@ export async function createProduct(productData: Omit<Product, 'id' | 'totalStoc
       email: user.email
     } : { uid: "system", name: "System" };
 
-    // Check if SKU already exists
-    const existingProduct = await prisma.product.findUnique({
-      where: { sku: productData.sku }
-    });
+    // Check if SKU already exists using raw query
+    const existingProducts: any[] = await prisma.$queryRaw`SELECT id FROM products WHERE sku = ${productData.sku} LIMIT 1`;
+    const existingProduct = existingProducts[0];
 
     if (existingProduct) {
       throw new Error(`Product with SKU "${productData.sku}" already exists`);
     }
 
-    // Set branch2 to 0 as it is no longer used in the UI
-    const branch2 = 0;
-    const totalStock = (productData.branch1 || 0) + branch2;
+    // Set totalStock based on quantity
+    const totalStock = (productData.quantity || 0);
     const id = `c${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
 
     // Use raw query to bypass outdated Prisma client validation for batchId and createdBy
     await prisma.$executeRawUnsafe(
-      `INSERT INTO products (id, name, sku, description, branch1, branch2, warehouseId, alertStock, cost, retailPrice, images, batchId, createdBy, createdAt, updatedAt) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
+      `INSERT INTO products (id, name, sku, description, quantity, warehouseId, alertStock, cost, retailPrice, images, batchId, createdBy, createdAt, updatedAt) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
       id,
       productData.name,
       productData.sku,
       productData.description || null,
-      productData.branch1 || 0,
-      branch2,
+      productData.quantity || 0,
       productData.warehouseId || null,
       productData.alertStock || 0,
       productData.cost || 0,
@@ -95,8 +90,7 @@ export async function createProduct(productData: Omit<Product, 'id' | 'totalStoc
       name: productData.name,
       sku: productData.sku,
       description: productData.description || "",
-      branch1: productData.branch1 || 0,
-      branch2: branch2,
+      quantity: productData.quantity || 0,
       warehouseId: productData.warehouseId || null,
       totalStock: totalStock,
       alertStock: productData.alertStock || 0,
@@ -119,12 +113,8 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
   try {
     // If SKU is being updated, check if it already exists (but not for the current product)
     if (productData.sku) {
-      const existingProduct = await prisma.product.findFirst({
-        where: {
-          sku: productData.sku,
-          id: { not: id }
-        }
-      });
+      const existingProducts: any[] = await prisma.$queryRaw`SELECT id FROM products WHERE sku = ${productData.sku} AND id != ${id} LIMIT 1`;
+      const existingProduct = existingProducts[0];
 
       if (existingProduct) {
         throw new Error(`Product with SKU "${productData.sku}" already exists`);
@@ -132,9 +122,8 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
     }
 
     // Get current product to calculate new totalStock if quantity changes
-    const currentProduct = await prisma.product.findUnique({
-      where: { id }
-    });
+    const currentProducts: any[] = await prisma.$queryRaw`SELECT * FROM products WHERE id = ${id} LIMIT 1`;
+    const currentProduct = currentProducts[0];
 
     if (!currentProduct) {
       throw new Error('Product not found');
@@ -147,8 +136,7 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
     if (productData.name !== undefined) { updates.push("name = ?"); values.push(productData.name); }
     if (productData.sku !== undefined) { updates.push("sku = ?"); values.push(productData.sku); }
     if (productData.description !== undefined) { updates.push("description = ?"); values.push(productData.description); }
-    if (productData.branch1 !== undefined) { updates.push("branch1 = ?"); values.push(productData.branch1); }
-    if (productData.branch2 !== undefined) { updates.push("branch2 = ?"); values.push(productData.branch2); }
+    if (productData.quantity !== undefined) { updates.push("quantity = ?"); values.push(productData.quantity); }
     if (productData.warehouseId !== undefined) { updates.push("warehouseId = ?"); values.push(productData.warehouseId); }
     if (productData.alertStock !== undefined) { updates.push("alertStock = ?"); values.push(productData.alertStock); }
     if (productData.cost !== undefined) { updates.push("cost = ?"); values.push(productData.cost); }
@@ -173,10 +161,9 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
       name: updatedProduct.name,
       sku: updatedProduct.sku,
       description: updatedProduct.description || "",
-      branch1: updatedProduct.branch1,
-      branch2: updatedProduct.branch2,
+      quantity: (updatedProduct as any).quantity,
       warehouseId: (updatedProduct as any).warehouseId,
-      totalStock: updatedProduct.branch1 + updatedProduct.branch2,
+      totalStock: (updatedProduct as any).quantity,
       alertStock: updatedProduct.alertStock,
       cost: updatedProduct.cost,
       retailPrice: updatedProduct.retailPrice || 0,
@@ -191,9 +178,8 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
 
 export async function deleteProduct(id: string): Promise<void> {
   try {
-    await prisma.product.delete({
-      where: { id },
-    });
+    // Use raw query to avoid schema validation errors with stale client
+    await prisma.$executeRawUnsafe(`DELETE FROM products WHERE id = ?`, id);
   } catch (error) {
     throw new Error(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }

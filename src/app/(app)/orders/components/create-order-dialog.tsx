@@ -40,6 +40,7 @@ interface CreateOrderDialogProps {
   customers: Customer[];
   products: Product[];
   stations: Station[];
+  batches: Batch[]; // Added batches prop
 }
 
 const paymentStatuses: PaymentStatus[] = ["Hold", "Paid", "Unpaid", "PAID PENDING"];
@@ -54,6 +55,7 @@ export function CreateOrderDialog({
   customers,
   products,
   stations,
+  batches,
 }: CreateOrderDialogProps) {
   const { toast } = useToast();
   const router = useRouter();

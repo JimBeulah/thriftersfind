@@ -162,7 +162,7 @@ export async function deleteWarehouseProduct(id: string): Promise<{ success: boo
 
 export async function transferToInventory(
     warehouseProductId: string,
-    destination: "branch1" | "branch2" | "warehouse",
+    destination: "quantity" | "warehouse",
     quantity: number
 ): Promise<{ success: boolean; error?: string }> {
     try {
@@ -186,7 +186,7 @@ export async function transferToInventory(
         if (inventoryProduct) {
             // Update existing product quantity
             const updateData: any = {};
-            updateData[destination] = inventoryProduct[destination] + quantity;
+            updateData[destination] = (inventoryProduct as any)[destination] + quantity;
 
             await prisma.product.update({
                 where: { id: inventoryProduct.id },
@@ -200,8 +200,8 @@ export async function transferToInventory(
                 cost: warehouseProduct.cost,
                 retailPrice: warehouseProduct.retailPrice,
                 images: warehouseProduct.images,
-                branch1: 0,
-                branch2: 0,
+                quantity: 0,
+                // branch2 removed
                 warehouse: 0,
                 alertStock: 0,
             };

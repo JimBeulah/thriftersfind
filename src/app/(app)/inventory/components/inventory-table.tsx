@@ -23,6 +23,7 @@ import { MoreHorizontal, PlusCircle, Search, X, Image as ImageIcon, AlertTriangl
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { AddProductDialog } from "./add-product-dialog";
+import { AddQuantityDialog } from "./add-quantity-dialog";
 import type { Product } from "@/lib/types";
 import { EditProductDialog } from "./edit-product-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +51,7 @@ export default function InventoryTable({ products: initialProducts }: { products
   const itemsPerPage = 10;
   const [isAddDialogOpen, setAddDialogOpen] = React.useState(false);
   const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
+  const [addingQuantityProduct, setAddingQuantityProduct] = React.useState<Product | null>(null);
 
   const refreshProducts = () => {
     router.refresh();
@@ -190,6 +192,10 @@ export default function InventoryTable({ products: initialProducts }: { products
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setAddingQuantityProduct(product)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Stock
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setEditingProduct(product)}>Edit</DropdownMenuItem>
                           <AlertDialogTrigger asChild>
                             <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
@@ -254,6 +260,12 @@ export default function InventoryTable({ products: initialProducts }: { products
         isOpen={!!editingProduct}
         onClose={() => setEditingProduct(null)}
         product={editingProduct}
+        onSuccess={refreshProducts}
+      />
+      <AddQuantityDialog
+        isOpen={!!addingQuantityProduct}
+        onClose={() => setAddingQuantityProduct(null)}
+        product={addingQuantityProduct}
         onSuccess={refreshProducts}
       />
     </>
