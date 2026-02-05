@@ -44,6 +44,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShippingStatus, Order, Customer, Batch } from "@/lib/types";
 import { startOfWeek, startOfMonth, startOfYear, endOfToday, isWithinInterval } from "date-fns";
 import { getBatches } from "../batches/actions";
+import { getAllOrders } from "../orders/actions";
 import { ViewOrderDialog } from "../orders/components/view-order-dialog";
 
 const shippingStatusStyles: Record<ShippingStatus, string> = {
@@ -77,10 +78,9 @@ export default function DashboardPage() {
         setError(null);
 
         // Fetch orders
-        const ordersResponse = await fetch('/api/orders');
-        if (!ordersResponse.ok) throw new Error('Failed to fetch orders');
-        const ordersData = await ordersResponse.json();
-        setAllOrders(ordersData.success ? ordersData.data : []);
+        // Fetch ALL orders (for dashboard aggregation)
+        const ordersData = await getAllOrders();
+        setAllOrders(ordersData);
 
         // Fetch customers
         const customersResponse = await fetch('/api/customers');
@@ -104,7 +104,7 @@ export default function DashboardPage() {
   }, []);
 
   const heldOrders = allOrders.filter(order => order.paymentStatus === 'Hold');
-  const recentOrders = allOrders.slice(0, 5);
+
 
   const filteredData = useMemo(() => {
     const now = new Date();
@@ -152,11 +152,34 @@ export default function DashboardPage() {
   const { orders: filteredOrders, customers: filteredCustomers } = filteredData;
 
   const topSales = useMemo(() => {
-    // Show individual sales instead of merging
-    return [...filteredOrders].sort((a, b) => {
-      if (b.quantity !== a.quantity) return b.quantity - a.quantity;
-      return b.totalAmount - a.totalAmount;
-    }).slice(0, 5);
+    const salesByProduct: Record<string, { id: string, itemName: string, quantity: number, totalAmount: number }> = {};
+
+    filteredOrders.forEach(order => {
+      if (order.items && order.items.length > 0) {
+        order.items.forEach((item: any) => {
+          const name = item.product?.name || item.productName || "Unknown Item";
+          const price = item.product?.retailPrice || item.product?.cost || 0;
+          const amount = item.quantity * price;
+
+          if (!salesByProduct[name]) {
+            salesByProduct[name] = { id: name, itemName: name, quantity: 0, totalAmount: 0 };
+          }
+          salesByProduct[name].quantity += item.quantity;
+          salesByProduct[name].totalAmount += amount;
+        });
+      } else {
+        const name = order.itemName;
+        if (!salesByProduct[name]) {
+          salesByProduct[name] = { id: name, itemName: name, quantity: 0, totalAmount: 0 };
+        }
+        salesByProduct[name].quantity += order.quantity;
+        salesByProduct[name].totalAmount += order.totalAmount;
+      }
+    });
+
+    return Object.values(salesByProduct)
+      .sort((a, b) => b.totalAmount - a.totalAmount)
+      .slice(0, 5);
   }, [filteredOrders]);
 
   const topBatches = useMemo(() => {
@@ -172,10 +195,10 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col gap-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent w-fit">Dashboard</h1>
         </div>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2">Loading dashboard data...</span>
         </div>
       </div>
@@ -186,7 +209,7 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col gap-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent w-fit">Dashboard</h1>
         </div>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
@@ -199,65 +222,80 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <Tabs value={timeframe} onValueChange={(value) => setTimeframe(value as Timeframe)}>
-          <TabsList>
-            <TabsTrigger value="week">This Week</TabsTrigger>
-            <TabsTrigger value="month">This Month</TabsTrigger>
-            <TabsTrigger value="year">This Year</TabsTrigger>
+    <div className="flex flex-col gap-8 p-2">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent w-fit pb-1">
+            Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Overview of your store's performance
+          </p>
+        </div>
+        <Tabs value={timeframe} onValueChange={(value) => setTimeframe(value as Timeframe)} className="w-full md:w-auto">
+          <TabsList className="grid w-full grid-cols-3 md:w-auto">
+            <TabsTrigger value="week">Week</TabsTrigger>
+            <TabsTrigger value="month">Month</TabsTrigger>
+            <TabsTrigger value="year">Year</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-l-4 border-l-cyan-400 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <div className="h-8 w-8 rounded-full bg-cyan-100 dark:bg-cyan-900/50 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-cyan-700 dark:text-cyan-300">
               ₱{totalSales.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">For this {timeframe}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-pink-400 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <div className="h-8 w-8 rounded-full bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center">
+              <ShoppingCart className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalOrders}</div>
+            <div className="text-2xl font-bold text-pink-700 dark:text-pink-300">{totalOrders}</div>
             <p className="text-xs text-muted-foreground">For this {timeframe}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-purple-400 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">New Customers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
+              <Users className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{newCustomers}</div>
+            <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{newCustomers}</div>
             <p className="text-xs text-muted-foreground">For this {timeframe}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-orange-400 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Held Orders</CardTitle>
-            <Archive className="h-4 w-4 text-muted-foreground" />
+            <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center">
+              <Archive className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{heldOrdersCount}</div>
+            <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">{heldOrdersCount}</div>
             <p className="text-xs text-muted-foreground">Total orders on hold</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
+        <Card className="lg:col-span-4 border-t-4 border-t-cyan-500/50 shadow-sm">
           <CardHeader>
             <CardTitle>Sales Overview</CardTitle>
           </CardHeader>
@@ -265,72 +303,36 @@ export default function DashboardPage() {
             <SalesChart orders={filteredOrders || []} timeframe={timeframe} />
           </CardContent>
         </Card>
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3 border-t-4 border-t-pink-500/50 shadow-sm">
           <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
+            <CardTitle>Top Batches</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentOrders && recentOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell>
-                      <div className="font-medium">{order.customerName}</div>
-                      <div className="hidden text-sm text-muted-foreground md:inline">
-                        {order.customerEmail}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={shippingStatusStyles[order.shippingStatus]}>{order.shippingStatus}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">₱{order.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setViewOrder(order)}
-                      >
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <CardContent className="pl-2">
+            <BatchesChart batches={topBatches} height={350} />
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
+        <Card className="lg:col-span-4 shadow-sm border-t-4 border-t-purple-500/50">
           <CardHeader>
             <CardTitle>Top Sales (By Item)</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Total Sales</TableHead>
+                  <TableHead className="font-semibold">Item Name</TableHead>
+                  <TableHead className="text-right font-semibold">Quantity</TableHead>
+                  <TableHead className="text-right font-semibold">Total Sales</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {topSales.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.itemName}</TableCell>
+                  <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
+                    <TableCell className="font-medium text-cyan-700 dark:text-cyan-400">{item.itemName}</TableCell>
                     <TableCell className="text-right">{item.quantity}</TableCell>
-                    <TableCell className="text-right">₱{item.totalAmount.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-bold text-foreground">₱{item.totalAmount.toLocaleString()}</TableCell>
                   </TableRow>
                 ))}
                 {topSales.length === 0 && (
@@ -344,48 +346,119 @@ export default function DashboardPage() {
             </Table>
           </CardContent>
         </Card>
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3 shadow-sm border-t-4 border-t-emerald-500/50">
           <CardHeader>
-            <CardTitle>Top Batches</CardTitle>
+            <CardTitle>Recent Sales</CardTitle>
           </CardHeader>
-          <CardContent className="pl-2">
-            <BatchesChart batches={topBatches} />
+          <CardContent>
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="font-semibold">Item</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="text-right font-semibold">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(() => {
+                  const recentItems = allOrders
+                    .flatMap(order => {
+                      if (order.items && order.items.length > 0) {
+                        return order.items.map((item: any, index: number) => ({
+                          id: `${order.id}-${index}`,
+                          itemName: item.product?.name || item.productName || "Unknown Item",
+                          quantity: item.quantity,
+                          totalAmount: item.quantity * (item.product?.retailPrice || item.product?.cost || 0),
+                          shippingStatus: order.shippingStatus,
+                          customerName: order.customerName,
+                          orderDate: order.orderDate
+                        }));
+                      } else {
+                        return [{
+                          id: order.id,
+                          itemName: order.itemName,
+                          quantity: order.quantity,
+                          totalAmount: order.totalAmount,
+                          shippingStatus: order.shippingStatus,
+                          customerName: order.customerName,
+                          orderDate: order.orderDate
+                        }];
+                      }
+                    })
+                    .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
+                    .slice(0, 5);
+
+                  return recentItems.map((item) => (
+                    <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
+                      <TableCell>
+                        <div className="font-medium text-pink-600 dark:text-pink-400">{item.itemName}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {item.customerName}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={shippingStatusStyles[item.shippingStatus as ShippingStatus]}>{item.shippingStatus}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="font-bold">₱{item.totalAmount.toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">{item.quantity} pcs</div>
+                      </TableCell>
+                    </TableRow>
+                  ));
+                })()}
+                {allOrders.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
+                      No recent sales
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Batch Summary</CardTitle>
+      <Card className="border-none shadow-none bg-transparent">
+        <CardHeader className="px-0 pt-0">
+          <CardTitle className="text-xl">Batch Summary</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-100 dark:bg-blue-900/50 p-3 rounded-full">
-              <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <p className="text-muted-foreground">Open Batches</p>
-              <p className="text-2xl font-bold">{batchSummary.open}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-full">
-              <Package className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-            </div>
-            <div>
-              <p className="text-muted-foreground">Closed Batches</p>
-              <p className="text-2xl font-bold">{batchSummary.closed}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="bg-green-100 dark:bg-green-900/50 p-3 rounded-full">
-              <Package className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="text-muted-foreground">Completed Batches</p>
-              <p className="text-2xl font-bold">{batchSummary.completed}</p>
-            </div>
-          </div>
-        </CardContent>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-blue-900/10 shadow-sm">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-blue-100 dark:bg-blue-900/50 p-3 rounded-full">
+                <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-medium">Open Batches</p>
+                <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">{batchSummary.open}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-yellow-500 bg-gradient-to-br from-white to-yellow-50 dark:from-gray-900 dark:to-yellow-900/10 shadow-sm">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-full">
+                <Package className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-medium">Closed Batches</p>
+                <p className="text-3xl font-bold text-yellow-700 dark:text-yellow-300">{batchSummary.closed}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-white to-green-50 dark:from-gray-900 dark:to-green-900/10 shadow-sm">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="bg-green-100 dark:bg-green-900/50 p-3 rounded-full">
+                <Package className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-medium">Completed Batches</p>
+                <p className="text-3xl font-bold text-green-700 dark:text-green-300">{batchSummary.completed}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </Card>
 
       <ViewOrderDialog

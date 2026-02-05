@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectProductDialog } from "./select-product-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Image as ImageIcon } from "lucide-react";
 import { createOrder } from "../actions";
 import { useRouter } from "next/navigation";
@@ -66,7 +67,7 @@ export function CreateOrderDialog({
   const [address, setAddress] = useState("");
 
   // Multiple Items State
-  const [selectedItems, setSelectedItems] = useState<{ product: Product; quantity: number | string }[]>([]);
+  const [selectedItems, setSelectedItems] = useState<{ product: Product; quantity: number | string; batchName?: string }[]>([]);
 
   const [shippingFee, setShippingFee] = useState("0");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
@@ -90,6 +91,13 @@ export function CreateOrderDialog({
     const sf = parseFloat(shippingFee) || 0;
     setTotalAmount(itemsTotal + sf);
   }, [selectedItems, shippingFee]);
+
+  useEffect(() => {
+    if (customerName === "Walk In Customer") {
+      setPaymentStatus("Paid");
+      setShippingStatus("Delivered");
+    }
+  }, [customerName]);
 
   const resetForm = () => {
     setCustomerName("Walk In Customer");
@@ -320,7 +328,8 @@ export function CreateOrderDialog({
       return updated;
     });
 
-    if (selectedBatchId && (!batchId || batchId === 'none')) {
+
+    if (selectedBatchId) {
       setBatchId(selectedBatchId);
     }
 
@@ -410,6 +419,14 @@ export function CreateOrderDialog({
                                       setCustomerName("Walk In Customer");
                                       setContactNumber("");
                                       setAddress("");
+                                      setPaymentStatus("Paid");
+                                      setShippingStatus("Delivered");
+                                      setShippingFee("0");
+                                      setRushShip(false);
+                                      setIsPickup(false);
+                                      setBatchId(null);
+                                      setCourierName("");
+                                      setTrackingNumber("");
                                       setComboboxOpen(false);
                                     }}
                                   >
@@ -497,6 +514,11 @@ export function CreateOrderDialog({
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-xs text-muted-foreground">SKU: {item.product.sku}</span>
                               <span className="text-xs font-medium text-primary">₱{item.product.retailPrice.toFixed(2)}</span>
+                              {item.batchName && (
+                                <Badge variant="secondary" className="text-[10px] px-1 h-5 ml-1">
+                                  {item.batchName}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
@@ -528,94 +550,117 @@ export function CreateOrderDialog({
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pb-2 border-b">Delivery & Payment</h3>
                   <div className="grid gap-6">
                     <div className="grid md:grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="shippingFee">Shipping Fee</Label>
-                        <Input
-                          id="shippingFee"
-                          type="number"
-                          value={shippingFee}
-                          onChange={(e) => setShippingFee(e.target.value)}
-                          placeholder="0.00"
-                          disabled={isPickup || customerName === "Walk In Customer"}
-                        />
-                      </div>
-                      <div className="grid gap-2">
+                      {customerName !== "Walk In Customer" && (
+                        <div className="grid gap-2">
+                          <Label htmlFor="shippingFee">Shipping Fee</Label>
+                          <Input
+                            id="shippingFee"
+                            type="number"
+                            value={shippingFee}
+                            onChange={(e) => setShippingFee(e.target.value)}
+                            placeholder="0.00"
+                            disabled={isPickup}
+                          />
+                        </div>
+                      )}
+                      <div className={cn("grid gap-2", customerName === "Walk In Customer" && "col-span-2")}>
                         <Label>Total Amount</Label>
                         <div className="font-bold text-xl text-primary">₱{totalAmount.toFixed(2)}</div>
                       </div>
                     </div>
 
-                    <div className="grid gap-2">
-                      <Label htmlFor="rushShip-create">Rush Ship</Label>
-                      <Select
-                        value={rushShip ? "yes" : "no"}
-                        onValueChange={(value) => setRushShip(value === "yes")}
-                        disabled={customerName === "Walk In Customer"}
-                      >
-                        <SelectTrigger id="rushShip-create">
-                          <SelectValue placeholder="Select priority" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="no">Standard Shipping</SelectItem>
-                          <SelectItem value="yes">Rush Shipping</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="pickup-station">Pickup Options</Label>
-                      <Select
-                        value={isPickup && selectedStationId ? selectedStationId : "delivery"}
-                        onValueChange={(value) => {
-                          if (value === "delivery") {
-                            setIsPickup(false);
-                            setSelectedStationId(null);
-                            setCourierName(""); // Reset courier name if switching back to delivery
-                          } else {
-                            setIsPickup(true);
-                            setShippingFee("0");
-                            setSelectedStationId(value);
-                          }
-                        }}
-                        disabled={customerName === "Walk In Customer"}
-                      >
-                        <SelectTrigger id="pickup-station">
-                          <SelectValue placeholder="Select delivery method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="delivery">Standard Delivery</SelectItem>
-                          {stations.length > 0 && <div className="border-t my-1" />}
-                          {stations.map((station) => (
-                            <SelectItem key={station.id} value={station.id}>
-                              Pickup at {station.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="grid gap-2">
-                        <Label htmlFor="courierName">Courier Name</Label>
-                        <Input
-                          id="courierName"
-                          value={courierName}
-                          onChange={(e) => setCourierName(e.target.value)}
-                          placeholder="Lalamove, J&T, etc."
+                        <Label htmlFor="rushShip-create">Rush Ship</Label>
+                        <Select
+                          value={rushShip ? "yes" : "no"}
+                          onValueChange={(value) => setRushShip(value === "yes")}
                           disabled={customerName === "Walk In Customer"}
-                        />
+                        >
+                          <SelectTrigger id="rushShip-create">
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no">Standard Shipping</SelectItem>
+                            <SelectItem value="yes">Rush Shipping</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="trackingNumber">Tracking Number</Label>
-                        <Input
-                          id="trackingNumber"
-                          value={trackingNumber}
-                          onChange={(e) => setTrackingNumber(e.target.value)}
-                          placeholder="TRACKING-123"
-                          disabled={customerName === "Walk In Customer"}
-                        />
+                        <Label>Assign Batch</Label>
+                        <Select
+                          value={batchId && batchId !== 'hold' && batchId !== 'none' ? batchId : ''}
+                          onValueChange={(value) => setBatchId(value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select batch" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {batches && batches.filter(b => b.status === "Open").map(b => (
+                              <SelectItem key={b.id} value={b.id}>
+                                {b.batchName} ({format(new Date(b.manufactureDate), 'MMM d')})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
+
+                    {customerName !== "Walk In Customer" && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="pickup-station">Pickup Options</Label>
+                        <Select
+                          value={isPickup && selectedStationId ? selectedStationId : "delivery"}
+                          onValueChange={(value) => {
+                            if (value === "delivery") {
+                              setIsPickup(false);
+                              setSelectedStationId(null);
+                              setCourierName(""); // Reset courier name if switching back to delivery
+                            } else {
+                              setIsPickup(true);
+                              setShippingFee("0");
+                              setSelectedStationId(value);
+                            }
+                          }}
+                        >
+                          <SelectTrigger id="pickup-station">
+                            <SelectValue placeholder="Select delivery method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="delivery">Standard Delivery</SelectItem>
+                            {stations.length > 0 && <div className="border-t my-1" />}
+                            {stations.map((station) => (
+                              <SelectItem key={station.id} value={station.id}>
+                                Pickup at {station.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {customerName !== "Walk In Customer" && (
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="courierName">Courier Name</Label>
+                          <Input
+                            id="courierName"
+                            value={courierName}
+                            onChange={(e) => setCourierName(e.target.value)}
+                            placeholder="Lalamove, J&T, etc."
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="trackingNumber">Tracking Number</Label>
+                          <Input
+                            id="trackingNumber"
+                            value={trackingNumber}
+                            onChange={(e) => setTrackingNumber(e.target.value)}
+                            placeholder="TRACKING-123"
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid gap-2">
                       <Label htmlFor="remarks-create">Remarks</Label>
@@ -638,7 +683,7 @@ export function CreateOrderDialog({
                         <Label htmlFor="batchId">Delivery Batch</Label>
                         <Select
                           onValueChange={(value) => setBatchId(value)}
-                          value={batchId || ''}
+                          value={batchId && batchId !== 'hold' ? 'none' : (batchId || '')}
                           disabled={customerName === "Walk In Customer"}
                         >
                           <SelectTrigger>
@@ -647,12 +692,6 @@ export function CreateOrderDialog({
                           <SelectContent>
                             <SelectItem value="hold">Hold for Next Batch</SelectItem>
                             <SelectItem value="none">Normal Delivery</SelectItem>
-                            {batches?.length > 0 && <div className="border-t my-1" />}
-                            {batches?.map((batch) => (
-                              <SelectItem key={batch.id} value={batch.id}>
-                                {batch.batchName} ({format(new Date(batch.manufactureDate), "MMM d")})
-                              </SelectItem>
-                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -677,7 +716,7 @@ export function CreateOrderDialog({
                       </div>
                     </div>
                     <div className="grid md:grid-cols-2 gap-4 pb-4">
-                      <div className="grid gap-2">
+                      <div className={cn("grid gap-2", customerName === "Walk In Customer" && "col-span-2")}>
                         <Label htmlFor="paymentStatus">Payment Status</Label>
                         <Select
                           onValueChange={(value: PaymentStatus) => setPaymentStatus(value)}
@@ -696,25 +735,26 @@ export function CreateOrderDialog({
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="shippingStatus">Shipping Status</Label>
-                        <Select
-                          onValueChange={(value: ShippingStatus) => setShippingStatus(value)}
-                          value={shippingStatus}
-                          disabled={customerName === "Walk In Customer"}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {shippingStatuses.map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {s}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {customerName !== "Walk In Customer" && (
+                        <div className="grid gap-2">
+                          <Label htmlFor="shippingStatus">Shipping Status</Label>
+                          <Select
+                            onValueChange={(value: ShippingStatus) => setShippingStatus(value)}
+                            value={shippingStatus}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {shippingStatuses.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {s}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -731,7 +771,7 @@ export function CreateOrderDialog({
             </Button>}
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
       <SelectProductDialog
         isOpen={isProductSelectOpen}
         onClose={() => setProductSelectOpen(false)}

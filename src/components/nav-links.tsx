@@ -23,6 +23,7 @@ import {
   Computer,
   CalendarClock,
   Warehouse,
+  TrendingUp,
 } from "lucide-react";
 import {
   SidebarMenu,
@@ -35,6 +36,9 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { UserPermissions } from "@/lib/types";
+import { stopImpersonating } from "@/lib/auth-actions";
+import { LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const links = [
   {
@@ -99,7 +103,7 @@ const links = [
   {
     href: "/sales",
     label: "Sales",
-    icon: <DollarSign />,
+    icon: <TrendingUp />,
     permission: "reports",
   },
 
@@ -127,14 +131,17 @@ const links = [
 interface NavLinksProps {
   permissions?: UserPermissions;
   role?: string;
+  isImpersonating?: boolean;
 }
 
-export function NavLinks({ permissions, role }: NavLinksProps) {
+export function NavLinks({ permissions, role, isImpersonating }: NavLinksProps) {
   const pathname = usePathname();
   const [isMounted, setIsMounted] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [adminManageOpen, setAdminManageOpen] = React.useState(false);
   const [preOrdersOpen, setPreOrdersOpen] = React.useState(false);
+
+  console.log("[NavLinks] Props - Role:", role, "IsImpersonating:", isImpersonating);
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -223,7 +230,7 @@ export function NavLinks({ permissions, role }: NavLinksProps) {
                         tooltip="Pre-order Inventory"
                       >
                         <Link href="/pre-orders/inventory">
-                          <span>Inventory</span>
+                          <span>Item List</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

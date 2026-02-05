@@ -3,10 +3,18 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+import { getCurrentUser } from "@/lib/auth-server";
+import { unstable_noStore as noStore } from "next/cache";
+
 export async function getNotifications() {
+    noStore();
     try {
+        const user = await getCurrentUser();
+        if (!user) return [];
+
         const notifications = await prisma.$queryRawUnsafe(
-            `SELECT * FROM notifications ORDER BY createdAt DESC LIMIT 20`
+            `SELECT * FROM notifications WHERE userId = ? OR userId IS NULL ORDER BY createdAt DESC LIMIT 20`,
+            user.id
         );
         return notifications as any[];
     } catch (error) {

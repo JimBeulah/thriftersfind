@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -31,10 +30,11 @@ import {
 interface AddProductDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (product?: any) => void;
+  simpleMode?: boolean;
 }
 
-export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialogProps) {
+export function AddProductDialog({ isOpen, onClose, onSuccess, simpleMode = false }: AddProductDialogProps) {
   const { toast } = useToast();
 
   const [name, setName] = useState("");
@@ -49,11 +49,7 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-
-
-
-
-
+  // Restore helper functions
   const sku = baseSku + (variantColor ? "-" + variantColor : "");
 
   const regenerateSku = () => {
@@ -71,7 +67,6 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
     setAlertStock("0");
     setImages([]);
     setImagePreviews([]);
-
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,12 +87,15 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
   const handleSave = async () => {
     const missingFields = [];
     if (!name) missingFields.push("Product Name");
-    if (!description) missingFields.push("Description");
-    if (!cost || parseFloat(cost) <= 0) missingFields.push("Cost");
+
+    if (!simpleMode) {
+      if (!description) missingFields.push("Description");
+      if (!cost || parseFloat(cost) <= 0) missingFields.push("Cost");
+      if (!quantity && quantity !== "0") missingFields.push("Quantity");
+      if (!alertStock && alertStock !== "0") missingFields.push("Alert Stock");
+      if (images.length === 0) missingFields.push("Product Images");
+    }
     if (!retailPrice || parseFloat(retailPrice) <= 0) missingFields.push("Retail Price");
-    if (!quantity && quantity !== "0") missingFields.push("Quantity");
-    if (!alertStock && alertStock !== "0") missingFields.push("Alert Stock");
-    if (images.length === 0) missingFields.push("Product Images");
 
     if (missingFields.length > 0) {
       toast({
@@ -111,7 +109,7 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
     setIsLoading(true);
 
     try {
-      // Convert uploaded files to data URLs
+      // Convert uploaded files to data URLs (if any)
       const imageDataUrls: string[] = [];
 
       for (const file of images) {
@@ -126,8 +124,8 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
 
       const productData = {
         name,
-        sku,
-        description,
+        sku: simpleMode ? (name.toUpperCase().replace(/\s+/g, '-') + '-' + Math.floor(Math.random() * 1000)) : sku,
+        description: description || (simpleMode ? "Auto-created from Pre-order" : ""),
         quantity: parseInt(quantity) || 0,
         alertStock: parseInt(alertStock) || 0,
         cost: parseFloat(cost) || 0,
@@ -135,7 +133,7 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
         images: imageDataUrls,
       };
 
-      await createProduct(productData);
+      const newProduct = await createProduct(productData);
 
       toast({
         title: "Product Added",
@@ -144,7 +142,7 @@ export function AddProductDialog({ isOpen, onClose, onSuccess }: AddProductDialo
 
       resetForm();
       onClose();
-      onSuccess?.();
+      onSuccess?.(newProduct);
     } catch (error) {
       toast({
         variant: "destructive",

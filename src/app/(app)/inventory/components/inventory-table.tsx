@@ -167,7 +167,7 @@ export default function InventoryTable({ products: initialProducts }: { products
                   <TableCell className="text-right">{product.totalStock}</TableCell>
                   <TableCell className="text-center">
                     {product.totalStock === 0 ? (
-                      <Badge variant="destructive" className="flex items-center gap-1">
+                      <Badge variant="outline" className="w-fit mx-auto flex items-center justify-center gap-1 border-red-500 text-red-500">
                         <X className="h-3 w-3" />
                         Out of Stock
                       </Badge>

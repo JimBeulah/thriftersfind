@@ -2,22 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-
-export interface WarehouseProduct {
-    id: string;
-    productName: string;
-    sku: string;
-    quantity: number;
-    manufacture_date?: Date | string | null;
-    image?: string | null;
-    location?: string | null;
-    cost: number;
-    retailPrice?: number | null;
-    images?: any;
-    createdBy?: any;
-    createdAt?: Date | string;
-    updatedAt?: Date | string;
-}
+import { WarehouseProduct } from "@/lib/types";
 
 export async function getWarehouseProducts(): Promise<WarehouseProduct[]> {
     try {
@@ -84,6 +69,7 @@ export async function createWarehouseProduct(data: {
     image?: string | null;
     location?: string | null;
     retailPrice?: number | null;
+    batchId?: string | null;
 }): Promise<{ success: boolean; error?: string }> {
     try {
         // Validate required fields
@@ -100,6 +86,7 @@ export async function createWarehouseProduct(data: {
                 image: data.image,
                 location: data.location,
                 retailPrice: data.retailPrice,
+                batchId: data.batchId || null,
             },
         });
 
@@ -122,6 +109,7 @@ export async function updateWarehouseProduct(
         image?: string | null;
         location?: string | null;
         retailPrice?: number | null;
+        batchId?: string | null;
     }
 ): Promise<{ success: boolean; error?: string }> {
     try {
@@ -136,6 +124,7 @@ export async function updateWarehouseProduct(
                 ...(data.image !== undefined && { image: data.image }),
                 ...(data.location !== undefined && { location: data.location }),
                 ...(data.retailPrice !== undefined && { retailPrice: data.retailPrice }),
+                ...(data.batchId !== undefined && { batchId: data.batchId }),
             },
         });
 

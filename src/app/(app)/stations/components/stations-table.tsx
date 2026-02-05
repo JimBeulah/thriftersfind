@@ -138,14 +138,14 @@ export default function StationsTable({ stations: initialStations }: { stations:
                             Map View
                         </TabsTrigger>
                     </TabsList>
-                    <Button onClick={() => setAddDialogOpen(true)}>
+                    <Button onClick={() => setAddDialogOpen(true)} className="bg-pink-600 hover:bg-pink-700 text-white">
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Add Station
                     </Button>
                 </div>
 
                 <TabsContent value="list" className="mt-0">
-                    <Card>
+                    <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
                         <div className="flex items-center justify-between gap-2 p-4 flex-wrap">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <div className="relative">
@@ -178,13 +178,13 @@ export default function StationsTable({ stations: initialStations }: { stations:
                         </div>
                         <CardContent className="p-0">
                             <Table>
-                                <TableHeader>
+                                <TableHeader className="bg-muted/30">
                                     <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Location</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Contact</TableHead>
-                                        <TableHead className="text-center">Status</TableHead>
+                                        <TableHead className="font-semibold">Name</TableHead>
+                                        <TableHead className="font-semibold">Location</TableHead>
+                                        <TableHead className="font-semibold">Type</TableHead>
+                                        <TableHead className="font-semibold">Contact</TableHead>
+                                        <TableHead className="text-center font-semibold">Status</TableHead>
                                         <TableHead>
                                             <span className="sr-only">Actions</span>
                                         </TableHead>
@@ -192,10 +192,10 @@ export default function StationsTable({ stations: initialStations }: { stations:
                                 </TableHeader>
                                 <TableBody>
                                     {paginatedStations.map((station) => (
-                                        <TableRow key={station.id}>
+                                        <TableRow key={station.id} className="hover:bg-muted/50 transition-colors">
                                             <TableCell className="font-medium">
                                                 <div className="flex items-center gap-2">
-                                                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                                                    <MapPin className="h-4 w-4 text-pink-500" />
                                                     {station.name}
                                                 </div>
                                             </TableCell>

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { getCurrentUser, checkPermission } from "@/lib/auth-server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 
 export async function getUsers(): Promise<User[]> {
   const users = await (prisma.user as any).findMany({
@@ -37,9 +38,21 @@ export async function getUsers(): Promise<User[]> {
       updatedAt: user.branch.updatedAt ? user.branch.updatedAt.toISOString() : new Date().toISOString(),
     } : null,
     permissions: user.permissions as UserPermissions | null,
-    createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   }));
+}
+
+export async function getAuthenticatedUser(): Promise<{ user: User | null; isImpersonating: boolean }> {
+  const user = await getCurrentUser();
+
+  // Check for impersonator cookie
+  const cookieStore = await cookies();
+  const impersonatorId = cookieStore.get("impersonator_id")?.value;
+
+  return {
+    user: user || null,
+    isImpersonating: !!impersonatorId
+  };
 }
 
 export async function getBranches(): Promise<Branch[]> {

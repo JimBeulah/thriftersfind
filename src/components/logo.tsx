@@ -12,9 +12,17 @@ export function Logo({ className }: { className?: string }) {
   }, [])
 
   return (
-    <div className={cn("flex items-center gap-2 font-bold text-lg", className)} suppressHydrationWarning>
-      {isMounted && <Boxes className="h-6 w-6 shrink-0 text-primary" />}
-      <span className="group-data-[collapsible=icon]:hidden">ThriftersFind OMS</span>
+    <div className={cn("flex items-center gap-3", className)} suppressHydrationWarning>
+      {isMounted && (
+        <img
+          src="/images/logo.png"
+          alt="ThriftersFind Logo"
+          className="h-10 w-10 rounded-full object-cover shadow-sm"
+        />
+      )}
+      <span className="group-data-[collapsible=icon]:hidden text-[23px] font-vintage bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-md tracking-wide">
+        ThriftersFind OMS
+      </span>
     </div>
   )
 }

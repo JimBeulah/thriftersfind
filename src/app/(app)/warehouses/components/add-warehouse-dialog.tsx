@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { createWarehouseProduct } from "../actions";
+import { createWarehouseProduct } from "@/app/(app)/warehouses/server-actions";
+
 import { Package, MapPin, Calendar, Image as ImageIcon, DollarSign, Hash, X, RefreshCw } from "lucide-react";
 
 interface AddWarehouseDialogProps {
@@ -33,9 +34,13 @@ export function AddWarehouseDialog({ isOpen, onClose, onSuccess }: AddWarehouseD
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [location, setLocation] = useState("");
     const [quantity, setQuantity] = useState("");
+    const [alertStock, setAlertStock] = useState("");
     const [cost, setCost] = useState("");
     const [retailPrice, setRetailPrice] = useState("");
+
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+
 
     const regenerateSku = () => {
         setBaseSku(String.fromCharCode(65 + Math.floor(Math.random() * 26)) + "-" + Math.floor(Math.random() * 100).toString().padStart(2, '0'));
@@ -50,8 +55,10 @@ export function AddWarehouseDialog({ isOpen, onClose, onSuccess }: AddWarehouseD
         setImagePreview(null);
         setLocation("");
         setQuantity("");
+        setAlertStock("");
         setCost("");
         setRetailPrice("");
+
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,6 +73,8 @@ export function AddWarehouseDialog({ isOpen, onClose, onSuccess }: AddWarehouseD
         setImageFile(null);
         setImagePreview(null);
     };
+
+
 
     const handleSave = async () => {
         const generatedSku = baseSku + (variantColor ? "-" + variantColor : "");
@@ -99,8 +108,10 @@ export function AddWarehouseDialog({ isOpen, onClose, onSuccess }: AddWarehouseD
                 image: imageDataUrl,
                 location: location || null,
                 quantity: quantity ? parseInt(quantity) : 0,
+                alertStock: alertStock ? parseInt(alertStock) : 0,
                 cost: cost ? parseFloat(cost) : 0,
                 retailPrice: retailPrice ? parseFloat(retailPrice) : null,
+
             });
 
             if (result.success) {
@@ -159,6 +170,8 @@ export function AddWarehouseDialog({ isOpen, onClose, onSuccess }: AddWarehouseD
                                     className="w-full"
                                 />
                             </div>
+
+
                             <div className="space-y-2">
                                 <Label htmlFor="sku" className="flex items-center gap-2">
                                     <Hash className="w-4 h-4" />
@@ -285,20 +298,37 @@ export function AddWarehouseDialog({ isOpen, onClose, onSuccess }: AddWarehouseD
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="quantity" className="flex items-center gap-2">
-                                <Package className="w-4 h-4" />
-                                Quantity
-                            </Label>
-                            <Input
-                                id="quantity"
-                                type="number"
-                                min="0"
-                                value={quantity}
-                                onChange={(e) => setQuantity(e.target.value)}
-                                placeholder="0"
-                                className="w-full"
-                            />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="quantity" className="flex items-center gap-2">
+                                    <Package className="w-4 h-4" />
+                                    Quantity
+                                </Label>
+                                <Input
+                                    id="quantity"
+                                    type="number"
+                                    min="0"
+                                    value={quantity}
+                                    onChange={(e) => setQuantity(e.target.value)}
+                                    placeholder="0"
+                                    className="w-full"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="alertStock" className="flex items-center gap-2">
+                                    <Package className="w-4 h-4" />
+                                    Stock Alert
+                                </Label>
+                                <Input
+                                    id="alertStock"
+                                    type="number"
+                                    min="0"
+                                    value={alertStock}
+                                    onChange={(e) => setAlertStock(e.target.value)}
+                                    placeholder="0"
+                                    className="w-full"
+                                />
+                            </div>
                         </div>
                     </div>
 

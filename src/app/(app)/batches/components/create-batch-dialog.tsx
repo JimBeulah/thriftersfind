@@ -29,11 +29,12 @@ import { useRouter } from "next/navigation";
 interface CreateBatchDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (batch: Batch) => void;
 }
 
-type BatchStatus = "Open" | "Closed" | "Delivered" | "Cancelled";
+type BatchStatus = "Open" | "Closed";
 
-export function CreateBatchDialog({ isOpen, onClose }: CreateBatchDialogProps) {
+export function CreateBatchDialog({ isOpen, onClose, onSuccess }: CreateBatchDialogProps) {
   const { toast } = useToast();
 
   const [batchName, setBatchName] = useState("");
@@ -73,6 +74,9 @@ export function CreateBatchDialog({ isOpen, onClose }: CreateBatchDialogProps) {
         });
         resetForm();
         onClose();
+        if (onSuccess && result.data) {
+          onSuccess(result.data);
+        }
         router.refresh();
       } else {
         toast({
@@ -119,8 +123,6 @@ export function CreateBatchDialog({ isOpen, onClose }: CreateBatchDialogProps) {
               <SelectContent>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="Closed">Closed</SelectItem>
-                <SelectItem value="Delivered">Delivered</SelectItem>
-                <SelectItem value="Cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -180,7 +180,7 @@ export async function transferToInventory(
         }
 
         // Check if product exists in inventory by SKU
-        const inventoryProduct = await prisma.product.findUnique({
+        const inventoryProduct = await prisma.product.findFirst({
             where: { sku: warehouseProduct.sku }
         });
 
@@ -188,6 +188,11 @@ export async function transferToInventory(
             // Update existing product quantity
             const updateData: any = {};
             updateData[destination] = (inventoryProduct as any)[destination] + quantity;
+
+            // Update batchId if provided from warehouse
+            if (warehouseProduct.batchId) {
+                updateData.batchId = warehouseProduct.batchId;
+            }
 
             await prisma.product.update({
                 where: { id: inventoryProduct.id },
@@ -205,6 +210,7 @@ export async function transferToInventory(
                 // branch2 removed
                 warehouse: 0,
                 alertStock: 0,
+                batchId: warehouseProduct.batchId || null,
             };
             productData[destination] = quantity;
 
@@ -239,7 +245,7 @@ export async function transferToInventory(
         });
 
         // Log inventory product transfer in
-        const finalProduct = inventoryProduct || await prisma.product.findUnique({ where: { sku: warehouseProduct.sku } });
+        const finalProduct = inventoryProduct || await prisma.product.findFirst({ where: { sku: warehouseProduct.sku } });
         if (finalProduct) {
             await createInventoryLog({
                 action: "TRANSFER_IN",

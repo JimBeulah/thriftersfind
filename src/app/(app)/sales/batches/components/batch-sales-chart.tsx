@@ -108,7 +108,7 @@ export function BatchSalesChart({ data }: BatchSalesChartProps) {
 
     return (
         <>
-            <Card className="mb-8">
+            <Card className="mb-8 border-t-4 border-t-pink-500/50 shadow-sm">
                 <CardHeader>
                     <CardTitle>Sales Performance Over Batches</CardTitle>
                 </CardHeader>

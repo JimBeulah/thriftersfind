@@ -34,7 +34,7 @@ export async function getSalesData(timeframe: "week" | "month" | "year"): Promis
                     gte: startDate,
                     lte: endDate,
                 },
-                paymentStatus: 'Paid',
+                // Removed strict paymentStatus filter to match dashboard aggregation
             },
             orderBy: {
                 orderDate: 'desc',

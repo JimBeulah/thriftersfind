@@ -19,7 +19,6 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { SalesLog } from "@prisma/client";
 import { getSalesLogs, GetSalesLogsResult } from "@/actions/sales-logs";
 
@@ -74,9 +73,136 @@ export default function SalesLogsTable() {
         return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
     }
 
+    const renderOrderItems = (items: any) => {
+        if (!items) return <p className="text-sm text-muted-foreground">N/A</p>;
+        let data = items;
+        if (typeof items === 'string') {
+            try {
+                data = JSON.parse(items);
+            } catch (e) {
+                return <p className="text-sm text-red-500">Invalid JSON data</p>;
+            }
+        }
+
+        if (!Array.isArray(data)) {
+            return (
+                <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-[200px]">
+                    {JSON.stringify(data, null, 2)}
+                </pre>
+            );
+        }
+
+        if (data.length === 0) {
+            return <p className="text-sm text-muted-foreground">No items</p>;
+        }
+
+        return (
+            <div className="space-y-3 border rounded-md p-3">
+                {data.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-start border-b pb-2 last:border-0 last:pb-0 last:mb-0">
+                        <div className="flex-1 mr-4">
+                            <p className="text-sm font-medium">{item.product?.name || "Unknown Product"}</p>
+                            <p className="text-xs text-muted-foreground">SKU: {item.product?.sku || "N/A"}</p>
+                        </div>
+                        <div className="text-right whitespace-nowrap">
+                            <p className="text-sm font-medium">x{item.quantity}</p>
+                            {item.product?.cost !== undefined && (
+                                <p className="text-xs text-muted-foreground">
+                                    {formatCurrency(item.product.cost)}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
+    const renderShipments = (shipments: any) => {
+        if (!shipments) return <p className="text-sm text-muted-foreground">N/A</p>;
+        let data = shipments;
+        if (typeof shipments === 'string') {
+            try {
+                data = JSON.parse(shipments);
+            } catch (e) {
+                return <p className="text-sm text-red-500">Invalid JSON data</p>;
+            }
+        }
+
+        // According to orders/actions.ts:
+        // shipmentsJson = JSON.stringify({
+        //     address: orderData.address,
+        //     courier: orderData.courierName,
+        //     tracking: orderData.trackingNumber,
+        //     shippingFee: orderData.shippingFee
+        // });
+
+        return (
+            <div className="space-y-2 border rounded-md p-3">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                        <span className="font-medium text-muted-foreground block text-xs">Courier</span>
+                        <span>{data.courier || "N/A"}</span>
+                    </div>
+                    <div>
+                        <span className="font-medium text-muted-foreground block text-xs">Tracking Number</span>
+                        <span>{data.tracking || "N/A"}</span>
+                    </div>
+                    <div className="col-span-2">
+                        <span className="font-medium text-muted-foreground block text-xs">Address</span>
+                        <span className="break-words">{data.address || "N/A"}</span>
+                    </div>
+                    <div>
+                        <span className="font-medium text-muted-foreground block text-xs">Shipping Fee</span>
+                        <span>{formatCurrency(data.shippingFee)}</span>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    const renderOrderSnapshot = (snapshot: any) => {
+        if (!snapshot) return <p className="text-sm text-muted-foreground">N/A</p>;
+        let data = snapshot;
+        if (typeof snapshot === 'string') {
+            try {
+                data = JSON.parse(snapshot);
+            } catch (e) {
+                return <p className="text-sm text-red-500">Invalid JSON data</p>;
+            }
+        }
+
+        return (
+            <div className="space-y-2 border rounded-md p-3 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <span className="font-medium text-muted-foreground block text-xs">Order ID</span>
+                        <span>{data.id || "N/A"}</span>
+                    </div>
+                    <div>
+                        <span className="font-medium text-muted-foreground block text-xs">Dates</span>
+                        <span>{data.orderDate ? new Date(data.orderDate).toLocaleDateString() : "N/A"}</span>
+                    </div>
+                    <div>
+                        <span className="font-medium text-muted-foreground block text-xs">Payment</span>
+                        <span>{data.paymentMethod} ({data.paymentStatus})</span>
+                    </div>
+                    <div>
+                        <span className="font-medium text-muted-foreground block text-xs">Shipping Status</span>
+                        <span>{data.shippingStatus}</span>
+                    </div>
+                    <div className="col-span-2">
+                        <span className="font-medium text-muted-foreground block text-xs">Created By</span>
+                        <span>{data.createdBy?.name || "System"} ({data.createdBy?.email || "N/A"})</span>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <>
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
@@ -90,15 +216,15 @@ export default function SalesLogsTable() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[180px]">Date</TableHead>
-                                <TableHead>Customer</TableHead>
-                                <TableHead>Reference</TableHead>
-                                <TableHead>Products</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="text-right">Total Amount</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
+                        <TableHeader className="bg-muted/30">
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="w-[180px] font-semibold">Date</TableHead>
+                                <TableHead className="font-semibold">Customer</TableHead>
+                                <TableHead className="font-semibold">Reference</TableHead>
+                                <TableHead className="font-semibold">Products</TableHead>
+                                <TableHead className="font-semibold">Description</TableHead>
+                                <TableHead className="text-right font-semibold">Total Amount</TableHead>
+                                <TableHead className="text-right font-semibold">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -178,7 +304,7 @@ export default function SalesLogsTable() {
                         </DialogDescription>
                     </DialogHeader>
                     {selectedLog && (
-                        <ScrollArea className="flex-1 pr-4">
+                        <div className="flex-1 overflow-y-auto pr-4">
                             <div className="grid gap-4 py-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -193,14 +319,6 @@ export default function SalesLogsTable() {
                                         <h4 className="font-medium mb-1">Date</h4>
                                         <p className="text-sm text-muted-foreground">{new Date(selectedLog.createdAt).toLocaleString()}</p>
                                     </div>
-                                    <div>
-                                        <h4 className="font-medium mb-1">Order ID</h4>
-                                        <p className="text-sm text-muted-foreground">{selectedLog.orderId || "N/A"}</p>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-medium mb-1">Pre-Order ID</h4>
-                                        <p className="text-sm text-muted-foreground">{selectedLog.preOrderId || "N/A"}</p>
-                                    </div>
                                     <div className="col-span-2">
                                         <h4 className="font-medium mb-1">Description</h4>
                                         <p className="text-sm text-muted-foreground">{selectedLog.description}</p>
@@ -213,26 +331,22 @@ export default function SalesLogsTable() {
 
                                 <div className="grid grid-cols-1 gap-4 border-t pt-4">
                                     <div>
-                                        <h4 className="font-medium mb-2">Order Items (JSON)</h4>
-                                        <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-[200px]">
-                                            {formatJSON(selectedLog.order_items)}
-                                        </pre>
+                                        <h4 className="font-medium mb-2">Order Items</h4>
+                                        <div className="max-h-[300px] overflow-y-auto border rounded-md">
+                                            {renderOrderItems(selectedLog.order_items)}
+                                        </div>
                                     </div>
                                     <div>
-                                        <h4 className="font-medium mb-2">Shipments (JSON)</h4>
-                                        <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-[200px]">
-                                            {formatJSON(selectedLog.shipments)}
-                                        </pre>
+                                        <h4 className="font-medium mb-2">Shipments</h4>
+                                        {renderShipments(selectedLog.shipments)}
                                     </div>
                                     <div>
-                                        <h4 className="font-medium mb-2">Orders Snapshot (JSON)</h4>
-                                        <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-[200px]">
-                                            {formatJSON(selectedLog.orders)}
-                                        </pre>
+                                        <h4 className="font-medium mb-2">Orders Snapshot</h4>
+                                        {renderOrderSnapshot(selectedLog.orders)}
                                     </div>
                                 </div>
                             </div>
-                        </ScrollArea>
+                        </div>
                     )}
                 </DialogContent>
             </Dialog>

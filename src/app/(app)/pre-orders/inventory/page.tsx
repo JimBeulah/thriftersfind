@@ -1,4 +1,4 @@
-import { getPreOrderProducts } from "../actions";
+import { getPreOrderItems } from "../actions";
 // import { getProducts } from "../../inventory/actions";
 // import { getBatches } from "../../batches/actions";
 import PreOrderInventoryGrid from "../components/pre-order-inventory-grid";
@@ -9,20 +9,22 @@ export const metadata = {
 };
 
 export default async function PreOrderInventoryPage() {
-    const products = await getPreOrderProducts();
+    const products = await getPreOrderItems();
     // const batches = await getBatches(); 
 
     return (
-        <div className="space-y-8 p-4 md:p-8 pt-6">
-            <div className="flex items-center justify-between space-y-2">
+        <div className="flex flex-col gap-8 p-2">
+            <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">Pre-order Inventory</h2>
-                    <p className="text-muted-foreground">
+                    <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent w-fit pb-1">
+                        Pre-order Inventory
+                    </h2>
+                    <p className="text-muted-foreground mt-1">
                         Manage stock levels for your pre-order items.
                     </p>
                 </div>
             </div>
-            {/* @ts-ignore - modifying grid next */}
+            {/* @ts-ignore - fixing types next */}
             <PreOrderInventoryGrid products={products} />
         </div>
     );

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -28,37 +27,46 @@ import {
 } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { Customer, PaymentMethod, Batch, PreOrderProduct } from "@/lib/types";
+import { Customer, PaymentMethod, Batch } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ChevronsUpDown, Check, Package, Trash2, Plus } from "lucide-react";
+import { ChevronsUpDown, Check, Package, Trash2, Plus, ShoppingCart, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SelectPreOrderProductDialog } from "./select-pre-order-product-dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Image as ImageIcon } from "lucide-react";
 import { createPreOrder } from "../actions";
 import { useRouter } from "next/navigation";
 import { createCustomer } from "../../customers/actions";
-import { Station } from "../../stations/actions";
+import type { Station } from "../../stations/actions";
 import { format } from "date-fns";
+import { CreateBatchDialog } from "../../batches/components/create-batch-dialog";
+// import { getProductNames } from "../../inventory/actions";
+// import { AddProductDialog } from "../../inventory/components/add-product-dialog";
+import { CreatePreOrderProductDialog } from "./create-pre-order-product-dialog";
+import { SelectProductsDialog } from "./select-products-dialog";
+import { Product } from "@/lib/types";
 
 interface CreatePreOrderDialogProps {
     isOpen: boolean;
     onClose: () => void;
     customers: Customer[];
-    products: PreOrderProduct[];
     stations: Station[];
     batches?: Batch[];
 }
 
 const paymentMethods: PaymentMethod[] = ["COD", "GCash", "Bank Transfer"];
 
+interface OrderItem {
+    id: string; // temp id
+    name: string;
+    quantity: number | string;
+    price: number | string;
+    image?: string;
+}
+
 export function CreatePreOrderDialog({
     isOpen,
     onClose,
     customers,
-    products,
     stations,
     batches,
 }: CreatePreOrderDialogProps) {
@@ -71,24 +79,80 @@ export function CreatePreOrderDialog({
     const [contactNumber, setContactNumber] = useState("");
     const [address, setAddress] = useState("");
     const [email, setEmail] = useState("");
-    const [selectedItems, setSelectedItems] = useState<{ product: PreOrderProduct; quantity: number | string }[]>([]);
+    const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
     const [orderDate, setOrderDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [batchId, setBatchId] = useState<string>("none");
+    const [availableBatches, setAvailableBatches] = useState<Batch[]>(batches || []);
+
+    useEffect(() => {
+        if (batches) {
+            setAvailableBatches(batches);
+        }
+    }, [batches]);
+
+    // Multi-select state
+    const [selectedProductNames, setSelectedProductNames] = useState<string[]>([]);
 
     // Payment Terms State
-    const [paymentTerms, setPaymentTerms] = useState<"full" | "downpayment">("full");
+    const [paymentTerms, setPaymentTerms] = useState<"full" | "downpayment" | "topay">("full");
     const [depositAmount, setDepositAmount] = useState<number | string>(0);
 
     const [comboboxOpen, setComboboxOpen] = useState(false);
+    // const [itemComboboxOpen, setItemComboboxOpen] = useState(false);
     const [totalAmount, setTotalAmount] = useState(0);
-    const [isProductSelectOpen, setProductSelectOpen] = useState(false);
+    const [isCreateBatchOpen, setCreateBatchOpen] = useState(false);
+    const [addProductOpen, setAddProductOpen] = useState(false);
+    const [isSelectProductsOpen, setIsSelectProductsOpen] = useState(false);
+
+    // Legacy state removed: existingProductNames
+
+    const handleProductCreated = (product: any) => {
+        // Upon creation, add to list immediately
+        const newItem: OrderItem = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: product.name,
+            price: product.retailPrice || 0,
+            quantity: 1,
+            image: product.images?.[0]
+        };
+        setSelectedItems(prev => [...prev, newItem]);
+        toast({ title: "Product Created", description: `${product.name} added to order.` });
+        setAddProductOpen(false);
+    };
+
+    const handleBatchCreated = (batch: Batch) => {
+        setAvailableBatches(prev => [batch, ...prev]);
+        setBatchId(batch.id);
+        setCreateBatchOpen(false);
+    };
+
+    const handleProductsSelected = (products: Product[]) => {
+        const newItems: OrderItem[] = products.map(product => ({
+            id: Math.random().toString(36).substr(2, 9),
+            name: product.name,
+            price: 0,
+            quantity: 1,
+            image: product.images?.[0]
+        }));
+        setSelectedItems(prev => [...prev, ...newItems]);
+        toast({ title: "Items Added", description: `${products.length} items added to order.` });
+    };
+
+    // Removed useEffect for getProductNames since we use the modal now which fetches on open
+
 
     useEffect(() => {
-        const itemsTotal = selectedItems.reduce((sum, item) => sum + ((item.product.retailPrice || 0) * (typeof item.quantity === 'string' ? 0 : item.quantity)), 0);
+        const itemsTotal = selectedItems.reduce((sum, item) => {
+            const p = typeof item.price === 'string' ? parseFloat(item.price) || 0 : item.price;
+            const q = typeof item.quantity === 'string' ? parseFloat(item.quantity) || 0 : item.quantity;
+            return sum + (p * q);
+        }, 0);
         setTotalAmount(itemsTotal);
         if (paymentTerms === "full") {
             setDepositAmount(itemsTotal);
+        } else if (paymentTerms === "topay") {
+            setDepositAmount(0);
         }
     }, [selectedItems, paymentTerms]);
 
@@ -102,13 +166,39 @@ export function CreatePreOrderDialog({
         setEmail("");
         setOrderDate(new Date().toISOString().split('T')[0]);
         setPaymentTerms("full");
-        setPaymentTerms("full");
         setDepositAmount(0);
         setBatchId("none");
         setIsSubmitting(false);
+        setSelectedProductNames([]);
+    };
+
+    // handleAddItems removed as it's replaced by handleProductsSelected
+
+    const handleUpdateItem = (id: string, field: 'price' | 'quantity', value: string) => {
+        if (value === "") {
+            setSelectedItems(prev => prev.map(item => item.id === id ? { ...item, [field]: "" } : item));
+            return;
+        }
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue)) {
+            setSelectedItems(prev => prev.map(item => item.id === id ? { ...item, [field]: numValue } : item));
+        }
     };
 
     const handleSave = async () => {
+        // Validate items have price
+        if (selectedItems.some(i => {
+            const p = typeof i.price === 'string' ? parseFloat(i.price) || 0 : i.price;
+            return p <= 0;
+        })) {
+            toast({
+                variant: "destructive",
+                title: "Invalid Price",
+                description: "All items must have a price greater than 0.",
+            });
+            return;
+        }
+
         if (!customerName || selectedItems.length === 0) {
             toast({
                 variant: "destructive",
@@ -125,7 +215,6 @@ export function CreatePreOrderDialog({
             let finalCustomerEmail = email || existingCustomer?.email || `${customerName.split(' ').join('.').toLowerCase()}@example.com`;
 
             if (!existingCustomer) {
-                // Auto-create customer if not exists
                 const newCustomer = await createCustomer({
                     name: customerName,
                     email: finalCustomerEmail,
@@ -144,19 +233,29 @@ export function CreatePreOrderDialog({
             }
 
             const itemsPayload = selectedItems.map(item => ({
-                productId: item.product.id, // mapped to preOrderProductId in action
-                productName: item.product.name,
-                quantity: typeof item.quantity === 'string' ? 0 : item.quantity,
-                pricePerUnit: item.product.retailPrice || 0,
+                productName: item.name,
+                quantity: typeof item.quantity === 'string' ? parseFloat(item.quantity) || 0 : item.quantity,
+                pricePerUnit: typeof item.price === 'string' ? parseFloat(item.price) || 0 : item.price,
+                images: item.image ? [item.image] : [],
             }));
 
-            // Determine final deposit amount based on terms
-            const finalDeposit = paymentTerms === 'full'
-                ? totalAmount
-                : (typeof depositAmount === 'string' ? parseFloat(depositAmount) || 0 : depositAmount);
-            const finalPaymentStatus = paymentTerms === 'full'
-                ? 'Paid'
-                : (finalDeposit > 0 ? 'Partial' : 'Unpaid'); // Or handle 'Unpaid' if 0 deposit
+            let finalDeposit = 0;
+            if (paymentTerms === 'full') {
+                finalDeposit = totalAmount;
+            } else if (paymentTerms === 'topay') {
+                finalDeposit = 0;
+            } else {
+                finalDeposit = typeof depositAmount === 'string' ? parseFloat(depositAmount) || 0 : depositAmount;
+            }
+
+            let finalPaymentStatus = 'Unpaid';
+            if (paymentTerms === 'full') {
+                finalPaymentStatus = 'Paid';
+            } else if (paymentTerms === 'topay') {
+                finalPaymentStatus = 'Unpaid';
+            } else {
+                finalPaymentStatus = finalDeposit > 0 ? 'Partial' : 'Unpaid';
+            }
 
             await createPreOrder({
                 customerName,
@@ -165,7 +264,7 @@ export function CreatePreOrderDialog({
                 orderDate,
                 totalAmount,
                 paymentMethod,
-                paymentStatus: finalPaymentStatus, // Updated logic
+                paymentStatus: finalPaymentStatus,
                 depositAmount: finalDeposit,
                 customerId: finalCustomerId!,
                 customerEmail: finalCustomerEmail,
@@ -204,41 +303,9 @@ export function CreatePreOrderDialog({
         setComboboxOpen(false);
     }
 
-    const handleProductSelect = (newSelectedItems: { product: PreOrderProduct; quantity: number | string }[]) => {
-        setSelectedItems(prev => {
-            const updated = [...prev];
-            newSelectedItems.forEach(newItem => {
-                const existingIndex = updated.findIndex(item => item.product.id === newItem.product.id);
-                if (existingIndex > -1) {
-                    const currentQty = typeof updated[existingIndex].quantity === 'string' ? 0 : updated[existingIndex].quantity;
-                    const newQty = typeof newItem.quantity === 'string' ? 0 : newItem.quantity;
-                    updated[existingIndex].quantity = currentQty + newQty;
-                } else {
-                    updated.push(newItem);
-                }
-            });
-            return updated;
-        });
-        setProductSelectOpen(false);
+    const removeItem = (id: string) => {
+        setSelectedItems(prev => prev.filter(item => item.id !== id));
     };
-
-    const removeItem = (productId: string) => {
-        setSelectedItems(prev => prev.filter(item => item.product.id !== productId));
-    };
-
-    const updateItemQuantity = (productId: string, quantity: string) => {
-        setSelectedItems(prev => prev.map(item =>
-            item.product.id === productId ? { ...item, quantity: quantity === "" ? "" : Math.max(0, parseInt(quantity) || 0) } : item
-        ));
-    };
-
-    // Helper to safely get image
-    const getProductImage = (product: PreOrderProduct) => {
-        if (Array.isArray(product.images) && product.images.length > 0) {
-            return product.images[0];
-        }
-        return undefined;
-    }
 
     return (
         <>
@@ -249,9 +316,6 @@ export function CreatePreOrderDialog({
                             <Package className="h-5 w-5 text-indigo-500" />
                             Create Pre-order
                         </DialogTitle>
-                        <DialogDescription>
-                            Add a new pre-order.
-                        </DialogDescription>
                     </DialogHeader>
 
                     <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
@@ -334,37 +398,72 @@ export function CreatePreOrderDialog({
 
                         {/* Items Selection */}
                         <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold">2. Order Items</Label>
-                                <Button variant="secondary" size="sm" onClick={() => setProductSelectOpen(true)} className="h-8">
-                                    <Plus className="mr-2 h-3.5 w-3.5" /> Add Items
+                            <Label className="text-base font-semibold">2. Order Items</Label>
+
+                            {/* Items Selection Actions */}
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 justify-start h-12 border-dashed"
+                                    onClick={() => setIsSelectProductsOpen(true)}
+                                >
+                                    <Search className="mr-2 h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">Select Items from Inventory...</span>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="h-12 w-12 border-dashed px-0"
+                                    onClick={() => setAddProductOpen(true)}
+                                    title="Create New Product"
+                                >
+                                    <Plus className="h-4 w-4" />
                                 </Button>
                             </div>
 
+                            {/* Items Table with Inline Editing */}
                             {selectedItems.length === 0 ? (
-                                <div className="border border-dashed rounded-md p-6 text-center text-sm text-muted-foreground bg-muted/30">
-                                    No items selected. Click "Add Items" to browse inventory.
+                                <div className="text-center text-sm text-muted-foreground py-8 border rounded-lg bg-muted/10">
+                                    No items added yet.
                                 </div>
                             ) : (
-                                <div className="space-y-2">
-                                    {selectedItems.map((item) => (
-                                        <div key={item.product.id} className="flex items-center gap-3 p-2 bg-card border rounded-md">
-                                            <Avatar className="h-10 w-10 border">
-                                                <AvatarImage src={getProductImage(item.product)} />
-                                                <AvatarFallback><ImageIcon className="h-4 w-4" /></AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-medium text-sm truncate">{item.product.name}</div>
-                                                <div className="text-secondary-foreground text-xs">₱{item.product.retailPrice} each</div>
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                                    {selectedItems.map((item, index) => (
+                                        <div key={item.id} className="grid grid-cols-12 gap-2 items-center p-2 bg-card border rounded-md shadow-sm">
+                                            <div className="col-span-1 flex justify-center">
+                                                <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-xs overflow-hidden">
+                                                    {item.image ? (
+                                                        <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                                                    ) : (
+                                                        <span>{index + 1}</span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="col-span-5">
+                                                <div className="font-medium text-sm truncate" title={item.name}>{item.name}</div>
+                                            </div>
+                                            <div className="col-span-3">
+                                                <div className="relative">
+                                                    <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">₱</span>
+                                                    <Input
+                                                        type="number"
+                                                        className="h-8 pl-5 text-sm"
+                                                        value={item.price}
+                                                        onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)}
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="col-span-2">
                                                 <Input
                                                     type="number"
-                                                    className="w-16 h-8 text-center"
+                                                    className="h-8 text-sm text-center px-1"
                                                     value={item.quantity}
-                                                    onChange={(e) => updateItemQuantity(item.product.id, e.target.value)}
+                                                    onChange={(e) => handleUpdateItem(item.id, 'quantity', e.target.value)}
+                                                    placeholder="1"
                                                 />
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeItem(item.product.id)}>
+                                            </div>
+                                            <div className="col-span-1 flex justify-end">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => removeItem(item.id)}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -380,7 +479,7 @@ export function CreatePreOrderDialog({
                                 <Label className="text-base font-semibold">Payment Terms</Label>
                                 <RadioGroup
                                     value={paymentTerms}
-                                    onValueChange={(v: "full" | "downpayment") => setPaymentTerms(v)}
+                                    onValueChange={(v: "full" | "downpayment" | "topay") => setPaymentTerms(v)}
                                     className="flex items-center gap-4"
                                 >
                                     <div className="flex items-center space-x-2">
@@ -390,6 +489,10 @@ export function CreatePreOrderDialog({
                                     <div className="flex items-center space-x-2">
                                         <RadioGroupItem value="downpayment" id="r-down" />
                                         <Label htmlFor="r-down">Downpayment</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="topay" id="r-topay" />
+                                        <Label htmlFor="r-topay">To Pay</Label>
                                     </div>
                                 </RadioGroup>
                             </div>
@@ -437,21 +540,52 @@ export function CreatePreOrderDialog({
                                 </div>
                             )}
 
-                            <div className="grid gap-2">
-                                <Label>Delivery Batch</Label>
-                                <Select value={batchId} onValueChange={(v) => setBatchId(v)}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select delivery batch" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">Normal Delivery</SelectItem>
-                                        {batches?.map((batch) => (
-                                            <SelectItem key={batch.id} value={batch.id}>
-                                                {batch.batchName} ({format(new Date(batch.manufactureDate), 'MMM d')})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                            <div className="flex items-end gap-2">
+                                <div className="grid gap-2 flex-1">
+                                    <Label>Delivery Batch</Label>
+                                    <Select value={batchId} onValueChange={(v) => {
+                                        if (v === "none") {
+                                            setBatchId(v);
+                                            return;
+                                        }
+
+                                        const selectedBatch = availableBatches.find(b => b.id === v);
+                                        // Debug log
+                                        console.log("Selected batch:", selectedBatch);
+
+                                        const status = selectedBatch?.status?.trim().toLowerCase();
+                                        if (selectedBatch && status !== 'open') {
+                                            toast({
+                                                variant: "destructive",
+                                                title: `Batch is ${selectedBatch.status}`,
+                                                description: "This batch is closed and cannot be selected.",
+                                            });
+                                            return;
+                                        }
+                                        setBatchId(v);
+                                    }}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select delivery batch" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Normal Delivery</SelectItem>
+                                            {availableBatches.map((batch) => (
+                                                <SelectItem key={batch.id} value={batch.id}>
+                                                    {batch.batchName} ({batch.status}) - {format(new Date(batch.manufactureDate), 'MMM d')}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => setCreateBatchOpen(true)}
+                                    title="Create New Batch"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                </Button>
                             </div>
                         </div>
                     </div>
@@ -465,11 +599,22 @@ export function CreatePreOrderDialog({
                 </DialogContent>
             </Dialog>
 
-            <SelectPreOrderProductDialog
-                isOpen={isProductSelectOpen}
-                onClose={() => setProductSelectOpen(false)}
-                onProductSelect={handleProductSelect}
-                products={products} // Passed from page (PreOrderProduct[])
+            <CreateBatchDialog
+                isOpen={isCreateBatchOpen}
+                onClose={() => setCreateBatchOpen(false)}
+                onSuccess={handleBatchCreated}
+            />
+
+            <CreatePreOrderProductDialog
+                isOpen={addProductOpen}
+                onClose={() => setAddProductOpen(false)}
+                onSuccess={handleProductCreated}
+            />
+
+            <SelectProductsDialog
+                isOpen={isSelectProductsOpen}
+                onClose={() => setIsSelectProductsOpen(false)}
+                onSelect={handleProductsSelected}
             />
         </>
     );

@@ -4,25 +4,28 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 210 40% 96.1%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 174 83% 40%; /* Teal */
+    --primary: 174 83% 40%;
+    /* Teal */
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 240 10% 3.9%;
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
-    --accent: 330 85% 65%; /* Pink */
+    --accent: 330 85% 65%;
+    /* Pink */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 174 83% 40%; /* Teal */
+    --ring: 174 83% 40%;
+    /* Teal */
     --radius: 0.5rem;
 
     --chart-1: 174 83% 40%;
@@ -48,19 +51,22 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 4.8% 9.8%;
     --popover-foreground: 0 0% 98%;
-    --primary: 174 70% 60%; /* Lighter Teal for Dark Mode */
+    --primary: 174 70% 60%;
+    /* Lighter Teal for Dark Mode */
     --primary-foreground: 174 83% 10%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 330 85% 65%; /* Pink */
+    --accent: 330 85% 65%;
+    /* Pink */
     --accent-foreground: 330 84% 10%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 174 70% 60%; /* Teal */
+    --ring: 174 70% 60%;
+    /* Teal */
 
     --chart-1: 174 70% 60%;
     --chart-2: 330 85% 65%;
@@ -83,6 +89,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";

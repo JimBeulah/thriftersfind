@@ -8,12 +8,19 @@ export default async function InventoryLogsPage() {
     });
 
     return (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-8 p-2">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Inventory Logs</h1>
+                <div>
+                    <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent w-fit pb-1">
+                        Inventory Logs
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                        Track inventory movement and adjustments.
+                    </p>
+                </div>
             </div>
 
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
                 <CardHeader>
                     <CardTitle>Log History</CardTitle>
                 </CardHeader>

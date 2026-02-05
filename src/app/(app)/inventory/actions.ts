@@ -27,22 +27,70 @@ export async function getProducts(): Promise<Product[]> {
         return createdByData?.uid === user.id;
       });
 
-    return filteredProducts.map(product => ({
-      id: product.id,
-      name: product.name,
-      sku: product.sku,
-      description: product.description || "",
-      quantity: typeof (product as any).quantity === 'number' ? (product as any).quantity : 0,
-      warehouseId: (product as any).warehouseId || null,
-      totalStock: ((product as any).quantity || 0),
-      alertStock: typeof product.alertStock === 'number' ? product.alertStock : 0,
-      cost: typeof product.cost === 'number' ? product.cost : 0,
-      retailPrice: typeof product.retailPrice === 'number' ? product.retailPrice : 0,
-      images: Array.isArray(product.images) ? (product.images as unknown as string[]) : [],
-    }));
+    return filteredProducts.map(product => {
+      let images: string[] = [];
+      try {
+        if (Array.isArray(product.images)) {
+          images = product.images as unknown as string[];
+        } else if (typeof product.images === 'string') {
+          const parsed = JSON.parse(product.images);
+          if (Array.isArray(parsed)) images = parsed;
+        }
+      } catch (e) {
+        console.warn("Failed to parse images for product", product.id);
+      }
+
+      return {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        description: product.description || "",
+        quantity: typeof (product as any).quantity === 'number' ? (product as any).quantity : 0,
+        warehouseId: (product as any).warehouseId || null,
+        totalStock: ((product as any).quantity || 0),
+        alertStock: typeof product.alertStock === 'number' ? product.alertStock : 0,
+        cost: typeof product.cost === 'number' ? product.cost : 0,
+        retailPrice: typeof product.retailPrice === 'number' ? product.retailPrice : 0,
+        images: images,
+      };
+    });
   } catch (error) {
     console.error("Error fetching products:", error);
     throw new Error("Failed to fetch products. Please try again later.");
+  }
+}
+
+export async function getProductNames(): Promise<string[]> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    // Fetch all unique product names across all branches
+    const products = await prisma.product.findMany({
+      select: { name: true },
+      distinct: ['name'],
+      orderBy: { name: 'asc' },
+    });
+
+    // Client-side deduplication to handle case sensitivity and whitespace issues
+    // that the database 'distinct' might miss or handle differently
+    const uniqueNames = new Set<string>();
+    const result: string[] = [];
+
+    for (const p of products) {
+      if (!p.name) continue;
+
+      const normalized = p.name.trim().toLowerCase();
+      if (!uniqueNames.has(normalized)) {
+        uniqueNames.add(normalized);
+        result.push(p.name.trim()); // Return the original (trimmed) casing of the first occurrence
+      }
+    }
+
+    return result.sort((a, b) => a.localeCompare(b));
+  } catch (error) {
+    console.error("Error fetching product names:", error);
+    return [];
   }
 }
 
@@ -235,7 +283,58 @@ export async function updateProduct(id: string, productData: Partial<Omit<Produc
 
 export async function deleteProduct(id: string): Promise<void> {
   try {
-    // Use raw query to avoid schema validation errors with stale client
+    const user = await getCurrentUser();
+
+    // 1. Get product details before deletion
+    const products: any[] = await prisma.$queryRaw`SELECT * FROM products WHERE id = ${id} LIMIT 1`;
+    const product = products[0];
+
+    if (!product) {
+      // Already deleted or not found
+      return;
+    }
+
+    // 2. Check if there's a linked warehouse product or match by SKU
+    // We prefer SKU match because warehouseId might be null in some transfer cases
+    const warehouseProducts: any[] = await prisma.$queryRaw`SELECT * FROM warehouse_products WHERE sku = ${product.sku} LIMIT 1`;
+    const warehouseProduct = warehouseProducts[0];
+
+    if (warehouseProduct) {
+      // 3. Return stock to warehouse
+      await prisma.$executeRawUnsafe(
+        `UPDATE warehouse_products SET quantity = quantity + ?, updatedAt = NOW(3) WHERE id = ?`,
+        product.quantity,
+        warehouseProduct.id
+      );
+
+      // 4. Log the return
+      await createInventoryLog({
+        action: "RETURN_TO_WAREHOUSE",
+        productId: id,
+        warehouseProductId: warehouseProduct.id,
+        quantityChange: -product.quantity, // Negative change for branch product
+        previousStock: product.quantity,
+        newStock: 0,
+        reason: "Product deleted from branch, stock returned to warehouse",
+        referenceId: id,
+        branchId: user?.branchId || null,
+      });
+
+      // Log for warehouse side as well (optional, but good for tracking)
+      // We create a log entry linked to warehouseProductId but no productId (since it's being deleted)
+      await createInventoryLog({
+        action: "STOCK_RETURN",
+        warehouseProductId: warehouseProduct.id,
+        quantityChange: product.quantity,
+        previousStock: warehouseProduct.quantity,
+        newStock: warehouseProduct.quantity + product.quantity,
+        reason: `Returned from branch deletion (User: ${user?.name || 'Unknown'})`,
+        referenceId: id,
+        // branchId: null // Warehouse has no branch? Or is it global?
+      });
+    }
+
+    // 5. Delete the product
     await prisma.$executeRawUnsafe(`DELETE FROM products WHERE id = ?`, id);
   } catch (error) {
     throw new Error(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);

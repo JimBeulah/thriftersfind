@@ -1,4 +1,4 @@
-import { getPreOrders, getPreOrderProducts } from "../actions";
+import { getPreOrders } from "../actions";
 import { getCustomers } from "../../customers/actions";
 import { getStations } from "../../stations/actions";
 import { getBatches } from "../../batches/actions";
@@ -12,16 +12,17 @@ export const metadata = {
 export default async function PreOrdersPage() {
     const preOrders = await getPreOrders();
     const customers = await getCustomers();
-    const products = await getPreOrderProducts();
     const stations = await getStations();
     const batches = await getBatches();
 
     return (
-        <div className="space-y-8 p-4 md:p-8 pt-6">
-            <div className="flex items-center justify-between space-y-2">
+        <div className="flex flex-col gap-8 p-2">
+            <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">Pre-orders</h2>
-                    <p className="text-muted-foreground">
+                    <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent w-fit pb-1">
+                        Pre-orders
+                    </h2>
+                    <p className="text-muted-foreground mt-1">
                         Manage and track your upcoming pre-orders.
                     </p>
                 </div>
@@ -30,8 +31,6 @@ export default async function PreOrdersPage() {
             <PreOrderTable
                 orders={preOrders}
                 customers={customers}
-                products={products}
-                products={products}
                 stations={stations}
                 batches={batches}
             />

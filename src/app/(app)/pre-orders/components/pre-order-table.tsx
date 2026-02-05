@@ -25,7 +25,6 @@ import { PayBalanceDialog } from "./pay-balance-dialog";
 interface PreOrderTableProps {
     orders: PreOrder[];
     customers: Customer[];
-    products: PreOrderProduct[];
     stations: Station[];
     batches?: Batch[];
 }
@@ -43,7 +42,7 @@ const statusBadgeStyles: Record<ShippingStatus, string> = {
 // Mock payment statuses for the filter UI - in real app this would likely be on the Order object
 const PAYMENT_STATUSES = ["TO PAY", "DOWNPAYMENT", "PAID"];
 
-export default function PreOrderTable({ orders, customers, products, stations, batches }: PreOrderTableProps) {
+export default function PreOrderTable({ orders, customers, stations, batches }: PreOrderTableProps) {
     const [searchTerm, setSearchTerm] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState<string>("all");
     const [paymentStatusFilter, setPaymentStatusFilter] = React.useState<string>("all");
@@ -84,7 +83,7 @@ export default function PreOrderTable({ orders, customers, products, stations, b
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-white dark:bg-zinc-950 p-4 rounded-xl shadow-sm border">
+            <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-card p-4 rounded-xl shadow-sm border border-t-4 border-t-pink-500/50">
                 <div className="relative w-full xl:w-96">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -124,7 +123,7 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                         </SelectContent>
                     </Select>
 
-                    <Button className="w-full sm:w-auto" onClick={() => setCreateDialogOpen(true)}>
+                    <Button className="w-full sm:w-auto bg-pink-600 hover:bg-pink-700 text-white" onClick={() => setCreateDialogOpen(true)}>
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Pre order
                     </Button>
@@ -133,14 +132,14 @@ export default function PreOrderTable({ orders, customers, products, stations, b
 
             <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
                 <Table>
-                    <TableHeader className="bg-zinc-50 dark:bg-zinc-900/50">
+                    <TableHeader className="bg-muted/30">
                         <TableRow className="hover:bg-transparent">
-                            <TableHead className="w-[250px]">Item Details</TableHead>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Total</TableHead>
-                            <TableHead className="text-right text-green-600">Paid</TableHead>
-                            <TableHead className="text-right text-red-600">Bal</TableHead>
+                            <TableHead className="w-[250px] font-semibold">Item Details</TableHead>
+                            <TableHead className="font-semibold">Customer</TableHead>
+                            <TableHead className="font-semibold">Status</TableHead>
+                            <TableHead className="text-right font-semibold">Total</TableHead>
+                            <TableHead className="text-right text-green-600 font-semibold">Paid</TableHead>
+                            <TableHead className="text-right text-red-600 font-semibold">Bal</TableHead>
                             <TableHead className="w-[100px]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -167,7 +166,7 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                                                 <div className="space-y-1">
                                                     {order.items.map((item) => (
                                                         <div key={item.id} className="font-medium flex items-center gap-2 text-foreground">
-                                                            <ShoppingBag className="h-3.5 w-3.5 text-primary shrink-0" />
+                                                            <ShoppingBag className="h-3.5 w-3.5 text-pink-500 shrink-0" />
                                                             <span className="line-clamp-1" title={item.productName}>
                                                                 {item.productName} (x{item.quantity})
                                                             </span>
@@ -202,18 +201,62 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                                                 </div>
                                             </TableCell>
 
-                                            {/* Status Column */}
+                                            {/* Status Column - Circular Progress */}
                                             <TableCell className="align-top py-4">
-                                                <div className="flex flex-col gap-1">
-                                                    {/* Placeholder for Shipping Status if later added to PreOrder */}
-                                                    <Badge variant="outline" className="font-normal w-fit bg-zinc-100 text-zinc-800 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300">
-                                                        Pending
-                                                    </Badge>
+                                                {(() => {
+                                                    const amountPaid = order.depositAmount || 0;
+                                                    const percentage = Math.round((amountPaid / order.totalAmount) * 100);
+                                                    const circumference = 2 * Math.PI * 18; // radius = 18
+                                                    const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
-                                                    <Badge variant="secondary" className="w-fit text-[10px]">
-                                                        {order.paymentStatus}
-                                                    </Badge>
-                                                </div>
+                                                    return (
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="relative w-12 h-12">
+                                                                <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 40 40">
+                                                                    {/* Background circle */}
+                                                                    <circle
+                                                                        cx="20"
+                                                                        cy="20"
+                                                                        r="18"
+                                                                        stroke="currentColor"
+                                                                        strokeWidth="4"
+                                                                        fill="none"
+                                                                        className="text-zinc-200 dark:text-zinc-700"
+                                                                    />
+                                                                    {/* Progress circle */}
+                                                                    <circle
+                                                                        cx="20"
+                                                                        cy="20"
+                                                                        r="18"
+                                                                        stroke="currentColor"
+                                                                        strokeWidth="4"
+                                                                        fill="none"
+                                                                        strokeDasharray={circumference}
+                                                                        strokeDashoffset={strokeDashoffset}
+                                                                        strokeLinecap="round"
+                                                                        className={`transition-all duration-500 ${percentage === 100
+                                                                            ? 'text-green-500'
+                                                                            : percentage > 0
+                                                                                ? 'text-blue-500'
+                                                                                : 'text-zinc-400'
+                                                                            }`}
+                                                                    />
+                                                                </svg>
+                                                                {/* Percentage text */}
+                                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                                    <span className={`text-[10px] font-bold ${percentage === 100
+                                                                        ? 'text-green-600'
+                                                                        : percentage > 0
+                                                                            ? 'text-blue-600'
+                                                                            : 'text-zinc-500'
+                                                                        }`}>
+                                                                        {percentage}%
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </TableCell>
 
                                             {/* Total Column */}
@@ -272,7 +315,6 @@ export default function PreOrderTable({ orders, customers, products, stations, b
                 isOpen={isCreateDialogOpen}
                 onClose={() => setCreateDialogOpen(false)}
                 customers={customers}
-                products={products}
                 stations={stations}
                 batches={batches}
             />

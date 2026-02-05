@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth-server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import { createInventoryLog } from "@/lib/inventory-log-helper";
 
 export async function sendMessage(receiverId: string, content: string) {
@@ -32,6 +32,7 @@ export async function sendMessage(receiverId: string, content: string) {
 }
 
 export async function getMessages(otherUserId: string) {
+    noStore();
     try {
         const currentUser = await getCurrentUser();
         if (!currentUser) {
@@ -66,6 +67,7 @@ export async function getMessages(otherUserId: string) {
 }
 
 export async function getUnreadCounts() {
+    noStore();
     try {
         const currentUser = await getCurrentUser();
         if (!currentUser) return {};
@@ -182,17 +184,19 @@ export async function transferStock(
                 throw new Error("Invalid transfer quantity");
             }
 
-            // 2. Check if product exists in inventory by SKU (globally unique)
+            // 2. Check if product exists in inventory by SKU AND createdBy uid (to match branch)
+            // Note: Since we dropped the unique SKU index, we can now look for the branch-specific product
             const inventoryProducts: any[] = await tx.$queryRawUnsafe(
-                `SELECT * FROM products WHERE sku = ? LIMIT 1`,
-                warehouseProduct.sku
+                `SELECT * FROM products WHERE sku = ? AND JSON_EXTRACT(createdBy, '$.uid') = ? LIMIT 1`,
+                warehouseProduct.sku,
+                creator.id
             );
             const inventoryProduct = inventoryProducts[0];
 
             let productId = '';
             if (inventoryProduct) {
                 productId = inventoryProduct.id;
-                console.log(`[transferStock] Updating existing product: ${productId}`);
+                console.log(`[transferStock] Updating existing product for ${creator.name}: ${productId}`);
                 // Update existing product quantity
                 await tx.$executeRawUnsafe(
                     `UPDATE products SET quantity = quantity + ?, updatedAt = NOW(3) WHERE id = ?`,
@@ -200,8 +204,22 @@ export async function transferStock(
                     productId
                 );
             } else {
+                let images = [];
+                if (warehouseProduct.image) {
+                    images.push(warehouseProduct.image);
+                } else if (warehouseProduct.images) {
+                    // Handle if images is already a JSON string or object
+                    const imgs = typeof warehouseProduct.images === 'string'
+                        ? JSON.parse(warehouseProduct.images)
+                        : warehouseProduct.images;
+
+                    if (Array.isArray(imgs)) {
+                        images = imgs;
+                    }
+                }
+
                 productId = `c${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-                console.log(`[transferStock] Creating new product in inventory: ${productId}`);
+                console.log(`[transferStock] Creating new product in inventory for ${creator.name}: ${productId}`);
                 // Create new product in inventory
                 await tx.$executeRawUnsafe(
                     `INSERT INTO products (id, name, sku, description, quantity, warehouseId, alertStock, cost, retailPrice, images, createdBy, createdAt, updatedAt) 
@@ -215,7 +233,7 @@ export async function transferStock(
                     0,
                     warehouseProduct.cost || 0,
                     warehouseProduct.retailPrice || 0,
-                    JSON.stringify(warehouseProduct.images || []),
+                    JSON.stringify(images),
                     JSON.stringify(createdBy)
                 );
             }
@@ -238,7 +256,24 @@ export async function transferStock(
                 branchId: branchId || null,
             }, tx, currentUser);
 
-            // 3. Reduce quantity in warehouse
+            // Log inventory product transfer in
+            const finalProduct = inventoryProduct || await prisma.product.findFirst({ where: { sku: warehouseProduct.sku } });
+
+            // Create notification for the transfer
+            const notificationId = `n${Math.random().toString(36).substring(2, 15)}`;
+            const now = new Date();
+            await tx.$executeRawUnsafe(
+                `INSERT INTO notifications (id, title, message, type, \`read\`, createdAt, updatedAt, userId) VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
+                notificationId,
+                "Stock Transfer Received",
+                `You received ${transferQty} unit(s) of ${warehouseProduct.productName} from Warehouse.`,
+                "transfer",
+                now,
+                now,
+                creator.id
+            );
+
+            // Reduce quantity in warehouse
             const newQuantity = warehouseProduct.quantity - transferQty;
             console.log(`[transferStock] New warehouse quantity: ${newQuantity}`);
 
@@ -303,10 +338,11 @@ export async function bulkTransferStock(
                 const transferQty = warehouseProduct.quantity;
                 console.log(`[bulkTransferStock] Transferring all (${transferQty}) for ${warehouseProduct.productName}`);
 
-                // Check if product exists in inventory by SKU (globally unique)
+                // Check if product exists in inventory by SKU and target User
                 const inventoryProducts: any[] = await tx.$queryRawUnsafe(
-                    `SELECT * FROM products WHERE sku = ? LIMIT 1`,
-                    warehouseProduct.sku
+                    `SELECT * FROM products WHERE sku = ? AND JSON_EXTRACT(createdBy, '$.uid') = ? LIMIT 1`,
+                    warehouseProduct.sku,
+                    creator.id
                 );
                 const inventoryProduct = inventoryProducts[0];
 
@@ -319,6 +355,20 @@ export async function bulkTransferStock(
                         targetProductId
                     );
                 } else {
+                    let images = [];
+                    if (warehouseProduct.image) {
+                        images.push(warehouseProduct.image);
+                    } else if (warehouseProduct.images) {
+                        // Handle if images is already a JSON string or object
+                        const imgs = typeof warehouseProduct.images === 'string'
+                            ? JSON.parse(warehouseProduct.images)
+                            : warehouseProduct.images;
+
+                        if (Array.isArray(imgs)) {
+                            images = imgs;
+                        }
+                    }
+
                     targetProductId = `c${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
                     await tx.$executeRawUnsafe(
                         `INSERT INTO products (id, name, sku, description, quantity, warehouseId, alertStock, cost, retailPrice, images, createdBy, createdAt, updatedAt) 
@@ -332,7 +382,7 @@ export async function bulkTransferStock(
                         0,
                         warehouseProduct.cost || 0,
                         warehouseProduct.retailPrice || 0,
-                        JSON.stringify(warehouseProduct.images || []),
+                        JSON.stringify(images),
                         JSON.stringify(createdBy)
                     );
                 }
@@ -348,6 +398,20 @@ export async function bulkTransferStock(
                     referenceId: targetProductId,
                     branchId: branchId || null,
                 }, tx, currentUser);
+
+                // Create notification for the bulk transfer
+                const notificationId = `n${Math.random().toString(36).substring(2, 15)}`;
+                const now = new Date();
+                await tx.$executeRawUnsafe(
+                    `INSERT INTO notifications (id, title, message, type, \`read\`, createdAt, updatedAt, userId) VALUES (?, ?, ?, ?, 0, ?, ?, ?)`,
+                    notificationId,
+                    "Bulk Stock Transfer",
+                    `You received ${transferQty} unit(s) of ${warehouseProduct.productName} (Bulk Transfer).`,
+                    "transfer",
+                    now,
+                    now,
+                    creator.id
+                );
 
                 // Delete since we transfer all in bulk
                 await tx.$executeRawUnsafe(`DELETE FROM warehouse_products WHERE id = ?`, id);

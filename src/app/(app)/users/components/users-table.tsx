@@ -28,23 +28,32 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MoreHorizontal, PlusCircle, Search, X } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Search, X, UserMinus } from "lucide-react";
 import type { User } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CreateUserDialog } from "./create-user-dialog";
 import { EditUserDialog } from "./edit-user-dialog";
-import { deleteUser } from "../actions";
+import { deleteUser, getUsers } from "../actions";
+import { impersonateUser } from "@/lib/auth-actions";
 import { useToast } from "@/hooks/use-toast";
 
 interface UsersTableProps {
   users: User[];
+  currentUser?: User | null;
   onUserAdded?: () => void;
   onUserUpdated?: () => void;
+  isImpersonating?: boolean;
 }
 
-export default function UsersTable({ users: initialUsers, onUserAdded, onUserUpdated }: UsersTableProps) {
+export default function UsersTable({ users: initialUsers, currentUser, onUserAdded, onUserUpdated, isImpersonating = false }: UsersTableProps) {
   const [users, setUsers] = React.useState<User[]>(initialUsers);
+  // ... (rest of state items are unchanged)
+
+  const isSuperAdmin = currentUser?.role?.name?.toLowerCase() === 'super admin';
+  const canImpersonate = isSuperAdmin || isImpersonating;
+
+  // ... (rest of logic)
   const [searchTerm, setSearchTerm] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
@@ -129,7 +138,7 @@ export default function UsersTable({ users: initialUsers, onUserAdded, onUserUpd
 
   return (
     <>
-      <Card>
+      <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
         <div className="flex items-center justify-between gap-2 p-4 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -149,18 +158,18 @@ export default function UsersTable({ users: initialUsers, onUserAdded, onUserUpd
               </Button>
             )}
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button className="bg-pink-600 hover:bg-pink-700 text-white" onClick={() => setCreateDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add User
           </Button>
         </div>
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="hidden md:table-cell">Created</TableHead>
+            <TableHeader className="bg-muted/30">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="font-semibold">User</TableHead>
+                <TableHead className="font-semibold">Role</TableHead>
+                <TableHead className="hidden md:table-cell font-semibold">Created</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -168,7 +177,7 @@ export default function UsersTable({ users: initialUsers, onUserAdded, onUserUpd
             </TableHeader>
             <TableBody>
               {paginatedUsers.map((user) => (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} className="hover:bg-muted/50">
                   <TableCell>
                     <div className="grid gap-0.5">
                       <div className="font-medium">{user.name}</div>
@@ -198,6 +207,35 @@ export default function UsersTable({ users: initialUsers, onUserAdded, onUserUpd
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEditUser(user)}>Edit</DropdownMenuItem>
+                        {canImpersonate && (
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              try {
+                                const result = await impersonateUser(user.id);
+                                if (result && result.error) {
+                                  toast({
+                                    variant: "destructive",
+                                    title: "Error",
+                                    description: result.error,
+                                  });
+                                }
+                              } catch (error: any) {
+                                console.error("Impersonation error:", error);
+                                // Ignore redirect errors
+                                if (error?.digest === 'NEXT_REDIRECT' || error?.message === 'NEXT_REDIRECT') return;
+
+                                toast({
+                                  variant: "destructive",
+                                  title: "Error",
+                                  description: error?.message || "Failed to impersonate user",
+                                });
+                              }
+                            }}
+                          >
+                            <UserMinus className="mr-2 h-4 w-4" />
+                            Impersonate
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteClick(user)}>Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -235,7 +273,7 @@ export default function UsersTable({ users: initialUsers, onUserAdded, onUserUpd
             </Button>
           </div>
         </div>
-      </Card>
+      </Card >
       <CreateUserDialog
         isOpen={isCreateDialogOpen}
         onClose={() => setCreateDialogOpen(false)}

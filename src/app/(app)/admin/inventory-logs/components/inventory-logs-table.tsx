@@ -120,14 +120,14 @@ export function InventoryLogsTable({ branches }: InventoryLogsTableProps) {
 
             <div className="rounded-md border">
                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Product</TableHead>
-                            <TableHead>Action</TableHead>
-                            <TableHead>Change</TableHead>
-                            <TableHead>Branch</TableHead>
-                            <TableHead>User</TableHead>
+                    <TableHeader className="bg-muted/30">
+                        <TableRow className="hover:bg-transparent">
+                            <TableHead className="font-semibold">Date</TableHead>
+                            <TableHead className="font-semibold">Product</TableHead>
+                            <TableHead className="font-semibold">Action</TableHead>
+                            <TableHead className="font-semibold">Change</TableHead>
+                            <TableHead className="font-semibold">Branch</TableHead>
+                            <TableHead className="font-semibold">User</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>

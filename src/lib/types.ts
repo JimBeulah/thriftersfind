@@ -193,14 +193,13 @@ export type PreOrder = {
 export type PreOrderItem = {
   id: string;
   preOrderId: string;
-  preOrderProductId: string;
   productName: string;
   quantity: number;
   pricePerUnit: number;
   totalPrice: number;
+  images?: any;
   createdAt: Date | string;
   updatedAt: Date | string;
-  product?: PreOrderProduct;
 };
 
 export type InventoryLog = {
@@ -226,4 +225,21 @@ export type InventoryLog = {
   preOrder?: { id: string; } | null;
   user?: { name: string; email: string } | null;
   branch?: { name: string; } | null;
+};
+
+export type WarehouseProduct = {
+  id: string;
+  productName: string;
+  sku: string;
+  quantity: number;
+  manufacture_date?: Date | string | null;
+  image?: string | null;
+  location?: string | null;
+  cost: number;
+  retailPrice?: number | null;
+  batchId?: string | null;
+  images?: any;
+  createdBy?: any;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 };

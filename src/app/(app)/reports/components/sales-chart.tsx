@@ -1,23 +1,13 @@
-
 "use client";
 
-import * as React from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartConfig
-} from "@/components/ui/chart";
+import React, { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Order } from '@/lib/types';
 import { format, eachDayOfInterval, startOfWeek, endOfWeek, eachWeekOfInterval, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { ApexOptions } from 'apexcharts';
 
-const chartConfig = {
-  sales: {
-    label: "Sales",
-    color: "hsl(var(--primary))",
-  },
-} satisfies ChartConfig;
+// Dynamically import Chart to avoid SSR issues with ApexCharts
+const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 interface SalesChartProps {
   orders: Order[];
@@ -25,100 +15,183 @@ interface SalesChartProps {
 }
 
 export default function SalesChart({ orders, timeframe }: SalesChartProps) {
-  const salesData = React.useMemo(() => {
-    if (!orders) return [];
+  const { categories, seriesData } = useMemo(() => {
+    if (!orders) return { categories: [], seriesData: [] };
 
     if (timeframe === 'week') {
       const now = new Date();
       const weekStart = startOfWeek(now);
       const weekEnd = endOfWeek(now);
       const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
-      
+
       const salesByDay: { [key: string]: number } = {};
+      const dayLabels: string[] = [];
+
       days.forEach(day => {
-        salesByDay[format(day, 'E')] = 0;
+        const label = format(day, 'E'); // Mon, Tue...
+        salesByDay[label] = 0;
+        dayLabels.push(label);
       });
 
       orders.forEach(order => {
         const orderDate = (order.createdAt as any)?.seconds ? new Date((order.createdAt as any).seconds * 1000) : new Date(order.orderDate);
         if (isWithinInterval(orderDate, { start: weekStart, end: weekEnd })) {
-            const dayOfWeek = format(orderDate, "E");
+          const dayOfWeek = format(orderDate, "E");
+          if (salesByDay.hasOwnProperty(dayOfWeek)) {
             salesByDay[dayOfWeek] += order.totalAmount;
+          }
         }
       });
-      return Object.entries(salesByDay).map(([day, sales]) => ({ time: day, sales }));
+      return {
+        categories: dayLabels,
+        seriesData: dayLabels.map(day => salesByDay[day])
+      };
     }
-    
+
     if (timeframe === 'month') {
-        const now = new Date();
-        const monthStart = startOfMonth(now);
-        const monthEnd = endOfMonth(now);
+      const now = new Date();
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
 
-        // Get all weeks in the current month
-        const weeks = eachWeekOfInterval({
-            start: monthStart,
-            end: monthEnd
-        }, { weekStartsOn: 1 }); // Monday as start of the week
+      const weeks = eachWeekOfInterval({
+        start: monthStart,
+        end: monthEnd
+      }, { weekStartsOn: 1 });
 
-        const salesByWeek: { [key: string]: number } = {};
-        weeks.forEach((week, index) => {
-            salesByWeek[`Week ${index + 1}`] = 0;
-        });
+      const salesByWeek: { [key: string]: number } = {};
+      const weekLabels: string[] = [];
 
-        orders.forEach(order => {
-            const orderDate = (order.createdAt as any)?.seconds ? new Date((order.createdAt as any).seconds * 1000) : new Date(order.orderDate);
-            if (isWithinInterval(orderDate, { start: monthStart, end: monthEnd })) {
-                const weekNumber = Math.ceil((orderDate.getDate() - (orderDate.getDay() || 7) + 1) / 7);
-                const weekKey = `Week ${weekNumber}`;
-                 if(salesByWeek.hasOwnProperty(weekKey)) {
-                   salesByWeek[weekKey] += order.totalAmount;
-                 }
-            }
-        });
+      weeks.forEach((week, index) => {
+        const label = `Week ${index + 1}`;
+        salesByWeek[label] = 0;
+        weekLabels.push(label);
+      });
 
-        return Object.entries(salesByWeek).map(([week, sales]) => ({ time: week, sales }));
+      orders.forEach(order => {
+        const orderDate = (order.createdAt as any)?.seconds ? new Date((order.createdAt as any).seconds * 1000) : new Date(order.orderDate);
+        if (isWithinInterval(orderDate, { start: monthStart, end: monthEnd })) {
+          // Calculate week index
+          const weekNumber = Math.ceil((orderDate.getDate() - (orderDate.getDay() || 7) + 1) / 7);
+          const weekKey = `Week ${weekNumber}`;
+          if (salesByWeek.hasOwnProperty(weekKey)) {
+            salesByWeek[weekKey] += order.totalAmount;
+          }
+        }
+      });
+
+      return {
+        categories: weekLabels,
+        seriesData: weekLabels.map(w => salesByWeek[w])
+      };
     }
-
 
     if (timeframe === 'year') {
-        const monthlySales: { [key: string]: number } = {};
-        const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        monthOrder.forEach(month => {
-            monthlySales[month] = 0;
-        });
+      const monthlySales: { [key: string]: number } = {};
+      const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      monthOrder.forEach(month => {
+        monthlySales[month] = 0;
+      });
 
-        orders.forEach(order => {
-            const orderDate = (order.createdAt as any)?.seconds ? new Date((order.createdAt as any).seconds * 1000) : new Date(order.orderDate);
-            const month = format(orderDate, "MMM");
-            if (monthlySales.hasOwnProperty(month)) {
-                 monthlySales[month] += order.totalAmount;
-            }
-        });
-        
-        return monthOrder.map(month => ({
-            time: month,
-            sales: monthlySales[month],
-        })).filter(d => d.sales > 0);
+      orders.forEach(order => {
+        const orderDate = (order.createdAt as any)?.seconds ? new Date((order.createdAt as any).seconds * 1000) : new Date(order.orderDate);
+        const month = format(orderDate, "MMM");
+        if (monthlySales.hasOwnProperty(month)) {
+          monthlySales[month] += order.totalAmount;
+        }
+      });
+
+      return {
+        categories: monthOrder,
+        seriesData: monthOrder.map(m => monthlySales[m])
+      };
     }
-    
-    return [];
+
+    return { categories: [], seriesData: [] };
 
   }, [orders, timeframe]);
 
+  const series = [{
+    name: "Total Sales",
+    data: seriesData
+  }];
+
+  const options: ApexOptions = {
+    chart: {
+      type: 'area',
+      height: 350,
+      fontFamily: 'inherit',
+      toolbar: {
+        show: false
+      },
+      zoom: {
+        enabled: false
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    stroke: {
+      curve: 'smooth',
+      width: 3
+    },
+    xaxis: {
+      categories: categories,
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
+      },
+      labels: {
+        style: {
+          colors: 'hsl(var(--muted-foreground))',
+          fontSize: '12px'
+        }
+      }
+    },
+    yaxis: {
+      labels: {
+        formatter: (value) => `₱${value.toLocaleString()}`,
+        style: {
+          colors: 'hsl(var(--muted-foreground))',
+          fontSize: '12px'
+        }
+      }
+    },
+    grid: {
+      show: true,
+      borderColor: 'hsl(var(--border))',
+      strokeDashArray: 4,
+      padding: {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 10
+      }
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.7,
+        opacityTo: 0.2,
+        stops: [0, 90, 100]
+      }
+    },
+    colors: ['#0ea5e9'],
+    tooltip: {
+      theme: 'dark',
+      y: {
+        formatter: function (val) {
+          return "₱" + val.toLocaleString()
+        }
+      }
+    }
+  };
+
   return (
-    <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-      <BarChart accessibilityLayer data={salesData}>
-        <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="time"
-          tickLine={false}
-          tickMargin={10}
-          axisLine={false}
-        />
-        <YAxis tickLine={false} axisLine={false} tickMargin={10} />
-        <ChartTooltip content={<ChartTooltipContent />} />
-        <Bar dataKey="sales" fill="var(--color-sales)" radius={4} />
-      </BarChart>
-    </ChartContainer>
+    <div className="w-full">
+      <Chart options={options} series={series} type="area" height={350} width="100%" />
+    </div>
   );
 }

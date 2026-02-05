@@ -602,7 +602,7 @@ export function EditOrderDialog({
                           <SelectItem value="none">Normal Delivery</SelectItem>
                           {/* Add actual batches here */}
                           {batches && batches.length > 0 && <div className="border-t my-1" />}
-                          {batches && batches.map(b => (
+                          {batches && batches.filter(b => b.status === "Open" && !b.batchName.toLowerCase().includes("batch test")).map(b => (
                             <SelectItem key={b.id} value={b.id}>{b.batchName}</SelectItem>
                           ))}
                         </SelectContent>

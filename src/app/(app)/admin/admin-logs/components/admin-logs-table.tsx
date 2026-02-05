@@ -80,7 +80,7 @@ export default function AdminLogsTable() {
 
     return (
         <>
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
@@ -94,14 +94,14 @@ export default function AdminLogsTable() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[180px]">Date</TableHead>
-                                <TableHead>Action</TableHead>
-                                <TableHead>Module</TableHead>
-                                <TableHead>Performed By</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
+                        <TableHeader className="bg-muted/30">
+                            <TableRow className="hover:bg-transparent">
+                                <TableHead className="w-[180px] font-semibold">Date</TableHead>
+                                <TableHead className="font-semibold">Action</TableHead>
+                                <TableHead className="font-semibold">Module</TableHead>
+                                <TableHead className="font-semibold">Performed By</TableHead>
+                                <TableHead className="font-semibold">Description</TableHead>
+                                <TableHead className="text-right font-semibold">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>

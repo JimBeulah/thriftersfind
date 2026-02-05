@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
 import { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { getBatches } from "../../batches/actions";
@@ -33,6 +34,7 @@ interface SelectProductDialogProps {
 }
 
 export function SelectProductDialog({ isOpen, onClose, onProductSelect, products: allProducts }: SelectProductDialogProps) {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<{ product: Product, quantity: number | string }[]>([]);
   const [selectedBatch, setSelectedBatch] = useState("all");
@@ -118,7 +120,25 @@ export function SelectProductDialog({ isOpen, onClose, onProductSelect, products
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+              <Select value={selectedBatch} onValueChange={(v) => {
+                if (v === "all") {
+                  setSelectedBatch(v);
+                  return;
+                }
+
+                const batch = batches.find(b => b.id === v);
+                const status = batch?.status?.trim().toLowerCase();
+
+                if (batch && status !== 'open') {
+                  toast({
+                    variant: "destructive",
+                    title: `Batch is ${batch.status}`,
+                    description: "This batch is closed and cannot be selected.",
+                  });
+                  return;
+                }
+                setSelectedBatch(v);
+              }}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Apply to Batch" />
                 </SelectTrigger>
@@ -126,7 +146,7 @@ export function SelectProductDialog({ isOpen, onClose, onProductSelect, products
                   <SelectItem value="all">None / Normal</SelectItem>
                   {batches.map((batch) => (
                     <SelectItem key={batch.id} value={batch.id}>
-                      {batch.batchName}
+                      {batch.batchName} ({batch.status})
                     </SelectItem>
                   ))}
                 </SelectContent>

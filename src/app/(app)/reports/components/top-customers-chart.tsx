@@ -1,59 +1,107 @@
-
 "use client";
 
-import * as React from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartConfig
-} from "@/components/ui/chart";
+import React, { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Customer } from '@/lib/types';
+import { ApexOptions } from 'apexcharts';
 
-const chartConfig = {
-  totalSpent: {
-    label: "Total Spent",
-    color: "hsl(var(--primary))",
-  },
-} satisfies ChartConfig;
+// Dynamically import Chart to avoid SSR issues
+const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface TopCustomersChartProps {
   customers: Customer[];
 }
 
 export default function TopCustomersChart({ customers }: TopCustomersChartProps) {
-  const topCustomersData = React.useMemo(() => {
-    if (!customers) return [];
-    
-    return customers
-      .map(c => ({ name: c.name, totalSpent: c.totalSpent }))
+  const chartData = useMemo(() => {
+    if (!customers) return { series: [], categories: [] };
+
+    const sortedCustomers = [...customers]
       .sort((a, b) => b.totalSpent - a.totalSpent)
-      .slice(0, 5);
+      .slice(0, 10); // Show top 10
+
+    const series = [{
+      name: 'Total Spent',
+      data: sortedCustomers.map(c => c.totalSpent)
+    }];
+
+    const categories = sortedCustomers.map(c => c.name);
+
+    return { series, categories };
   }, [customers]);
 
+  const chartOptions: ApexOptions = {
+    chart: {
+      type: 'bar',
+      height: 350,
+      toolbar: {
+        show: false
+      },
+      fontFamily: 'inherit'
+    },
+    plotOptions: {
+      bar: {
+        horizontal: true,
+        borderRadius: 4,
+        dataLabels: {
+          position: 'center', // inside bar
+        },
+      }
+    },
+    dataLabels: {
+      enabled: true,
+      formatter: function (val) {
+        return typeof val === 'number' ? `₱${val.toFixed(2)}` : val;
+      },
+      style: {
+        colors: ['#fff']
+      }
+    },
+    xaxis: {
+      categories: chartData.categories,
+      labels: {
+        formatter: function (val) {
+          return typeof val === 'number' ? `₱${val.toFixed(0)}` : val;
+        }
+      }
+    },
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return `₱${val.toFixed(2)}`;
+        }
+      }
+    },
+    colors: ['#0ea5e9'], // A nice blue similar to standard charts (Tailwind's sky-500)
+    grid: {
+      show: true,
+      borderColor: '#e5e7eb',
+      strokeDashArray: 0,
+      xaxis: {
+        lines: {
+          show: true
+        }
+      },
+      yaxis: {
+        lines: {
+          show: false
+        }
+      },
+    }
+  };
+
+  if (!customers || customers.length === 0) {
+    return <div className="p-4 text-center text-gray-500">No customer data available</div>;
+  }
+
   return (
-    <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-      <BarChart
-        accessibilityLayer
-        data={topCustomersData}
-        layout="vertical"
-        margin={{ left: 10 }}
-      >
-        <CartesianGrid horizontal={false} />
-        <YAxis
-          dataKey="name"
-          type="category"
-          tickLine={false}
-          tickMargin={10}
-          axisLine={false}
-          className="capitalize"
-          width={80}
-        />
-        <XAxis dataKey="totalSpent" type="number" hide />
-        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-        <Bar dataKey="totalSpent" fill="var(--color-totalSpent)" radius={5} layout="vertical" />
-      </BarChart>
-    </ChartContainer>
+    <div className="w-full min-h-[350px]">
+      <ReactApexChart
+        options={chartOptions}
+        series={chartData.series}
+        type="bar"
+        height={350}
+      />
+    </div>
   );
 }

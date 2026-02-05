@@ -11,8 +11,6 @@ export async function getCustomers(): Promise<Customer[]> {
     return [];
   }
 
-  const isSuperAdmin = user.role?.name === 'Super Admin';
-
   const customers = await prisma.customer.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
@@ -22,14 +20,18 @@ export async function getCustomers(): Promise<Customer[]> {
     }
   });
 
-  // Filter customers based on user role
-  const filteredCustomers = isSuperAdmin
-    ? customers
-    : customers.filter(customer => {
-      if (!(customer as any).createdBy) return false;
-      const createdByData = (customer as any).createdBy as any;
-      return createdByData?.uid === user.id;
-    });
+  // Filter: Show all customers EXCEPT "Walk In Customer" from other users
+  const filteredCustomers = customers.filter(customer => {
+    // Check if customer is "Walk In Customer" (case-insensitive)
+    const isWalkIn = customer.name.trim().toLowerCase() === "walk in customer";
+
+    // If not "Walk In Customer", show it (global visibility)
+    if (!isWalkIn) return true;
+
+    // If it IS "Walk In Customer", only show if created by current user
+    const createdBy = (customer as any).createdBy as { uid: string } | null;
+    return createdBy?.uid === user.id;
+  });
 
   return filteredCustomers.map(customer => ({
     id: customer.id,

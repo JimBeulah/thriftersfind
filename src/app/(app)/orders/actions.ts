@@ -66,6 +66,56 @@ export async function getOrders(): Promise<Order[]> {
   }));
 }
 
+export async function getAllOrders(): Promise<Order[]> {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return [];
+  }
+
+  // Fetch ALL orders regardless of creator
+  const orders = await prisma.order.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      customer: true,
+      batch: true,
+    }
+  });
+
+  return orders.map(order => ({
+    id: order.id,
+    customerName: order.customerName,
+    contactNumber: order.contactNumber || "",
+    address: order.address || "",
+    orderDate: order.orderDate ? order.orderDate.toISOString().split('T')[0] : "",
+    itemName: order.itemName,
+    items: (order as any).items ? (typeof (order as any).items === 'string' ? JSON.parse((order as any).items) : (order as any).items) : [],
+    quantity: order.quantity,
+    price: order.price,
+    shippingFee: order.shippingFee,
+    totalAmount: order.totalAmount,
+    paymentMethod: (order.paymentMethod as PaymentMethod) || "COD",
+    paymentStatus: (order.paymentStatus as PaymentStatus) || "Unpaid",
+    shippingStatus: (order.shippingStatus as ShippingStatus) || "Pending",
+    batchId: order.batchId,
+    createdAt: order.createdAt,
+    createdBy: (order.createdBy as any) || { uid: "system", name: "System" },
+    customerId: order.customerId,
+    customerEmail: order.customerEmail || "",
+    courierName: order.courierName || "",
+    trackingNumber: order.trackingNumber || "",
+    remarks: (order.remarks as OrderRemark) || "",
+    rushShip: order.rushShip,
+    batch: order.batch ? {
+      ...order.batch,
+      manufactureDate: (order.batch as any).manufactureDate.toISOString(),
+      status: order.batch.status as any,
+      totalOrders: order.batch.totalOrders || 0,
+      totalSales: order.batch.totalSales || 0,
+    } : undefined,
+  }));
+}
+
 export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt'> & { items?: any[] }): Promise<Order> {
   try {
     const user = await getCurrentUser();
@@ -157,20 +207,22 @@ export async function createOrder(orderData: Omit<Order, 'id' | 'createdAt'> & {
         }
       }
 
-      // Update Batch Totals ONLY if shippingStatus is 'Delivered'
-      if (orderData.shippingStatus === 'Delivered' && orderData.batchId && orderData.batchId !== 'none' && orderData.batchId !== 'hold') {
-        const batch = await tx.batch.findUnique({ where: { id: orderData.batchId } });
+      // Update Batch Totals for non-cancelled orders
+      const isValidBatchId = (bid: string | null | undefined) => bid && bid !== 'none' && bid !== 'hold';
+      if (orderData.shippingStatus !== 'Cancelled' && isValidBatchId(orderData.batchId)) {
+        const targetBatchId = orderData.batchId!;
+        const batch = await tx.batch.findUnique({ where: { id: targetBatchId } });
         if (batch) {
           await tx.batch.update({
-            where: { id: orderData.batchId },
+            where: { id: targetBatchId },
             data: {
               totalOrders: (batch.totalOrders || 0) + 1,
               totalSales: (batch.totalSales || 0) + orderData.totalAmount
             }
           });
-          console.log(`[BatchUpdate] Updated Batch ${orderData.batchId}: Orders +1, Sales +${orderData.totalAmount}`);
+          console.log(`[BatchUpdate] Updated Batch ${targetBatchId}: Orders +1, Sales +${orderData.totalAmount}`);
         } else {
-          console.warn(`[BatchUpdate] Batch ${orderData.batchId} not found!`);
+          console.warn(`[BatchUpdate] Batch ${targetBatchId} not found!`);
         }
       }
 
@@ -235,10 +287,9 @@ export async function updateOrder(id: string, data: Partial<Order>): Promise<Ord
       const existingOrder = await tx.order.findUnique({ where: { id } });
       if (!existingOrder) throw new Error("Order not found");
 
-      // 2. Manage Batch Totals based on shippingStatus transitions
-      // Stats should only be counted if shippingStatus === 'Delivered'
-      const wasDelivered = existingOrder.shippingStatus === 'Delivered';
-      const isNowDelivered = data.shippingStatus === 'Delivered' || (data.shippingStatus === undefined && wasDelivered);
+      // 2. Manage Batch Totals based on shippingStatus (excluding Cancelled)
+      const wasCountable = existingOrder.shippingStatus !== 'Cancelled';
+      const isNowCountable = data.shippingStatus !== 'Cancelled' && (data.shippingStatus !== undefined || wasCountable);
 
       const oldBatchId = existingOrder.batchId;
       const newBatchId = data.batchId !== undefined ? data.batchId : oldBatchId;
@@ -253,8 +304,8 @@ export async function updateOrder(id: string, data: Partial<Order>): Promise<Ord
       // Helper to check if batch is valid for stats
       const isValidBatch = (bid: string | null) => bid && bid !== 'none' && bid !== 'hold';
 
-      if (wasDelivered && !isNowDelivered) {
-        // Condition 1: Transition FROM Delivered TO something else -> Revert stats
+      if (wasCountable && !isNowCountable) {
+        // Condition 1: Transition FROM Countable TO non-Countable (Cancelled) -> Revert stats
         if (isValidBatch(oldBatchId)) {
           const batch = await tx.batch.findUnique({ where: { id: oldBatchId! } });
           if (batch) {
@@ -267,8 +318,8 @@ export async function updateOrder(id: string, data: Partial<Order>): Promise<Ord
             });
           }
         }
-      } else if (!wasDelivered && isNowDelivered) {
-        // Condition 2: Transition FROM non-Delivered TO Delivered -> Apply stats
+      } else if (!wasCountable && isNowCountable) {
+        // Condition 2: Transition FROM non-Countable TO Countable -> Apply stats
         if (isValidBatch(newBatchId)) {
           const batch = await tx.batch.findUnique({ where: { id: newBatchId! } });
           if (batch) {
@@ -281,8 +332,8 @@ export async function updateOrder(id: string, data: Partial<Order>): Promise<Ord
             });
           }
         }
-      } else if (wasDelivered && isNowDelivered) {
-        // Condition 3: Stayed Delivered but Batch or Amount changed -> Diff stats
+      } else if (wasCountable && isNowCountable) {
+        // Condition 3: Stayed Countable but Batch or Amount changed -> Diff stats
         if (batchChanged) {
           // Revert old
           if (isValidBatch(oldBatchId)) {
@@ -350,6 +401,7 @@ export async function updateOrder(id: string, data: Partial<Order>): Promise<Ord
           remarks: data.remarks,
           rushShip: data.rushShip,
           createdBy: data.createdBy as any,
+          items: data.items ? JSON.stringify(data.items) : undefined,
         },
       });
 
@@ -451,6 +503,7 @@ export async function cancelOrder(orderId: string): Promise<void> {
       }
 
       // 2. Parse items
+      // 2. Parse items
       const rawItems = (order as any).items;
       let items: any[] = [];
       try {
@@ -462,7 +515,7 @@ export async function cancelOrder(orderId: string): Promise<void> {
       console.log(`Order ${orderId} has ${items.length} items to restock`);
 
       if (!Array.isArray(items) || items.length === 0) {
-        console.warn(`No items found for order ${orderId} in structured 'items' field.`);
+        console.warn(`No items found for order ${orderId} in structured 'items' field. Using fallback or logging warning.`);
       }
 
       // 3. Restock inventory
@@ -484,7 +537,6 @@ export async function cancelOrder(orderId: string): Promise<void> {
           continue;
         }
 
-        const remark = order.remarks ? order.remarks.trim() : "";
         // Default to restocking quantity
         const updateData: any = { quantity: { increment: quantityToIncrement } };
         const location = "Main Inventory";
@@ -495,9 +547,9 @@ export async function cancelOrder(orderId: string): Promise<void> {
           const updatedProd = await tx.product.update({
             where: { id: productId },
             data: updateData,
-            select: { id: true, quantity: true } // Select returned data to confirm update
+            select: { id: true, quantity: true, name: true }
           });
-          console.log(`Stock updated for ${productId}. New level: ${updatedProd.quantity}`);
+          console.log(`Stock updated for ${updatedProd.name} (${productId}). New level: ${updatedProd.quantity}`);
 
           // Log inventory change
           const previousStock = updatedProd.quantity - quantityToIncrement;
@@ -518,12 +570,14 @@ export async function cancelOrder(orderId: string): Promise<void> {
         }
       }
 
-      // Update Batch Totals (Decrement) ONLY if status was 'Delivered'
-      if (order.shippingStatus === 'Delivered' && order.batchId && order.batchId !== 'none' && order.batchId !== 'hold') {
-        const batch = await tx.batch.findUnique({ where: { id: order.batchId } });
+      // Update Batch Totals (Decrement) if it was countable
+      const isValidBatchId = (bid: string | null | undefined) => bid && bid !== 'none' && bid !== 'hold';
+      if (order.shippingStatus !== 'Cancelled' && isValidBatchId(order.batchId)) {
+        const targetBatchId = order.batchId!;
+        const batch = await tx.batch.findUnique({ where: { id: targetBatchId } });
         if (batch) {
           await tx.batch.update({
-            where: { id: order.batchId },
+            where: { id: targetBatchId },
             data: {
               totalOrders: Math.max(0, (batch.totalOrders || 0) - 1),
               totalSales: Math.max(0, (batch.totalSales || 0) - order.totalAmount)
@@ -581,6 +635,7 @@ export async function cancelOrder(orderId: string): Promise<void> {
     revalidatePath("/inventory");
     revalidatePath("/customers");
     revalidatePath("/batches");
+    revalidatePath("/dashboard");
   } catch (error: any) {
     console.error("Error in cancelOrder:", error);
     throw new Error(error.message || "Failed to cancel order.");

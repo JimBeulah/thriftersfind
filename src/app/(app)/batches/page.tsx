@@ -3,6 +3,8 @@ import * as React from "react";
 import BatchesTable from "./components/batches-table";
 import { getBatches } from "./actions";
 
+export const dynamic = 'force-dynamic';
+
 export default async function BatchesPage() {
   const batches = await getBatches();
 

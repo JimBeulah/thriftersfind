@@ -23,9 +23,16 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
-      <Card className="max-w-2xl">
+    <div className="flex flex-col gap-8 p-2">
+      <div>
+        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent w-fit pb-1">
+          Profile
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Manage your account settings and preferences.
+        </p>
+      </div>
+      <Card className="max-w-2xl border-t-4 border-t-pink-500/50 shadow-sm">
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
           <CardDescription>Update your display name and email address.</CardDescription>
@@ -50,7 +57,7 @@ export default function ProfilePage() {
           </div>
         </CardContent>
         <CardFooter className="border-t px-6 py-4">
-          <Button onClick={handleSaveChanges}>
+          <Button className="bg-pink-600 hover:bg-pink-700 text-white" onClick={handleSaveChanges}>
             Save Changes
           </Button>
         </CardFooter>

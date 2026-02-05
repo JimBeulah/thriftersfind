@@ -74,6 +74,10 @@ model Notification {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
   @@map("notifications")
 }
 
@@ -91,6 +95,7 @@ model Batch {
   orders       Order[]
   preOrders    PreOrder[]
   products     Product[]
+  warehouseProducts WarehouseProduct[]
 
   @@map("batches")
 }
@@ -98,7 +103,7 @@ model Batch {
 model Product {
   id                 String            @id @default(cuid())
   name               String
-  sku                String            @unique
+  sku                String
   description        String?
   quantity           Int               @default(0)
   alertStock         Int               @default(0)
@@ -113,11 +118,12 @@ model Product {
 
   warehouseProduct   WarehouseProduct? @relation(fields: [warehouseId], references: [id])
   inventoryLogs      InventoryLog[]
-  preOrderProducts   PreOrderProduct[]
+
 
 
   batchId            String?           // Reference to batches
   batch              Batch?            @relation(fields: [batchId], references: [id])
+  preOrders          PreOrder[]
 
   @@index([warehouseId], map: "products_warehouseId_fkey")
   @@index([batchId], map: "products_batchId_fkey")
@@ -145,6 +151,7 @@ model User {
   @@index([roleId], map: "users_roleId_fkey")
   @@map("users")
   inventoryLogs InventoryLog[]
+  notifications Notification[]
 }
 
 model Message {
@@ -214,6 +221,7 @@ model WarehouseProduct {
   productName  String
   sku          String
   quantity     Int       @default(0)
+  alertStock   Int       @default(0)
   manufacture_date DateTime? // New field replacing manufacturer
   image        String?   @db.LongText // New image field
   location     String?   // Location within warehouse
@@ -223,6 +231,8 @@ model WarehouseProduct {
   createdBy    Json?     // { uid: string, name: string }
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @default(now()) @updatedAt
+  batchId      String?           // Reference to batches
+  batch        Batch?            @relation(fields: [batchId], references: [id])
   products     Product[] // Products that reference this warehouse product
   inventoryLogs InventoryLog[]
 
@@ -301,51 +311,36 @@ model PreOrder {
   items         PreOrderItem[]
   batchId       String?
   batch         Batch?          @relation(fields: [batchId], references: [id])
+  productId     String?
+  product       Product?        @relation(fields: [productId], references: [id])
 
   salesLogs     SalesLog[]
   inventoryLogs InventoryLog[]
 
   @@index([customerId], map: "pre_orders_customerId_fkey")
   @@index([batchId], map: "pre_orders_batchId_fkey")
+  @@index([productId], map: "pre_orders_productId_fkey")
   @@map("pre_orders")
 }
 
 model PreOrderItem {
   id                String          @id @default(cuid())
   preOrderId        String
-  preOrderProductId String
   productName       String
   quantity          Int
   pricePerUnit      Float
   totalPrice        Float
+  images            Json?           // [NEW] To store images directly on the item
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @default(now()) @updatedAt
   preOrder          PreOrder        @relation(fields: [preOrderId], references: [id], onDelete: Cascade)
-  product           PreOrderProduct @relation(fields: [preOrderProductId], references: [id])
 
   @@index([preOrderId], map: "pre_order_items_preOrderId_fkey")
-  @@index([preOrderProductId], map: "pre_order_items_preOrderProductId_fkey")
   @@map("pre_order_items")
 }
 
-model PreOrderProduct {
-  id            String         @id @default(cuid())
-  name          String
-  sku           String         @unique
-  description   String?
-  quantity      Int            @default(0)
-  alertStock    Int            @default(0)
-  cost          Float
-  retailPrice   Float?         @default(0)
-  images        Json?
-  inventoryProductId String?
-  inventoryProduct   Product? @relation(fields: [inventoryProductId], references: [id])
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @default(now()) @updatedAt
-  preOrderItems PreOrderItem[]
+// REMOVED PreOrderProduct model
 
-  @@map("pre_order_inventory")
-}
 
 model InventoryLog {
   id                 String            @id @default(cuid())

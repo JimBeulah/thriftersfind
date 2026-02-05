@@ -1,88 +1,81 @@
 "use client";
 
-import * as React from 'react';
-import { Pie, PieChart, Cell, Legend } from "recharts";
-import {
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
-    ChartConfig
-} from "@/components/ui/chart";
+import React, { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Batch } from '@/lib/types';
+import { cn } from "@/lib/utils";
+import { ApexOptions } from 'apexcharts';
 
-// Color palette for pie chart slices
-const COLORS = [
-    'hsl(var(--chart-1))',
-    'hsl(var(--chart-2))',
-    'hsl(var(--chart-3))',
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))',
-];
+// Dynamically import Chart to avoid SSR issues with ApexCharts
+const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 interface BatchesChartProps {
     batches: Batch[];
+    width?: string | number;
+    height?: string | number;
+    className?: string;
 }
 
-export default function BatchesChart({ batches }: BatchesChartProps) {
-    const chartData = React.useMemo(() => {
+export default function BatchesChart({ batches, width, height, className }: BatchesChartProps) {
+    const series = useMemo(() => {
         if (!batches || batches.length === 0) return [];
-
-        // Take top 5 batches and format for chart
-        return batches.map((batch, index) => ({
-            name: batch.batchName,
-            value: batch.totalSales || 0,
-            fill: COLORS[index % COLORS.length],
-        }));
+        return batches.map(b => b.totalSales || 0);
     }, [batches]);
 
-    const chartConfig = React.useMemo(() => {
-        const config: ChartConfig = {};
-        chartData.forEach((item, index) => {
-            config[item.name] = {
-                label: item.name,
-                color: COLORS[index % COLORS.length],
-            };
-        });
-        return config;
-    }, [chartData]);
+    const labels = useMemo(() => {
+        if (!batches || batches.length === 0) return [];
+        return batches.map(b => b.batchName);
+    }, [batches]);
 
-    if (chartData.length === 0) {
+    const options: ApexOptions = {
+        chart: {
+            type: 'pie',
+            toolbar: {
+                show: false
+            }
+        },
+        labels: labels,
+        colors: ['#008FFB', '#00E396', '#FEB019', '#FF4560', '#775DD0'],
+        legend: {
+            position: 'right',
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: function (val: number) {
+                return val.toFixed(1) + "%";
+            }
+        },
+        tooltip: {
+            y: {
+                formatter: function (val: number) {
+                    return "₱" + val.toLocaleString();
+                }
+            }
+        },
+        plotOptions: {
+            pie: {
+                expandOnClick: false
+            }
+        }
+    };
+
+    if (!batches || batches.length === 0) {
         return (
-            <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+            <div className={cn("flex items-center justify-center text-muted-foreground", className)} style={{ height: height || 350 }}>
                 No batch data available
             </div>
         );
     }
 
     return (
-        <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
-            <PieChart>
-                <ChartTooltip
-                    content={<ChartTooltipContent />}
-                    formatter={(value) => `₱${Number(value).toLocaleString()}`}
-                />
-                <Pie
-                    data={chartData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                >
-                    {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                </Pie>
-                <Legend
-                    verticalAlign="bottom"
-                    height={36}
-                    formatter={(value, entry: any) => {
-                        const dataEntry = chartData.find(d => d.name === value);
-                        return `${value}: ₱${dataEntry?.value.toLocaleString() || 0}`;
-                    }}
-                />
-            </PieChart>
-        </ChartContainer>
+        <div className={cn("w-full", className)}>
+            <Chart
+                options={options}
+                series={series}
+                type="pie"
+                width={width || "100%"}
+                height={height || 350}
+            />
+        </div>
     );
 }

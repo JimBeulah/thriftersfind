@@ -58,7 +58,7 @@ export async function createBodegaProduct(productData: Omit<Product, 'id' | 'tot
         } : { uid: "system", name: "System" };
 
         // Check if SKU already exists
-        const existingProduct = await prisma.product.findUnique({
+        const existingProduct = await prisma.product.findFirst({
             where: { sku: productData.sku }
         });
 

@@ -120,8 +120,6 @@ export function EditBatchDialog({ isOpen, onClose, batch }: EditBatchDialogProps
               <SelectContent>
                 <SelectItem value="Open">Open</SelectItem>
                 <SelectItem value="Closed">Closed</SelectItem>
-                <SelectItem value="Delivered">Delivered</SelectItem>
-                <SelectItem value="Cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>

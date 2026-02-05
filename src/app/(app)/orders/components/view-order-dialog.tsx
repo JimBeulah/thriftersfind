@@ -111,32 +111,107 @@ export function ViewOrderDialog({ isOpen, onClose, order }: ViewOrderDialogProps
                                         <Package className="h-4 w-4" />
                                         <span>Order Items</span>
                                     </div>
-                                    <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                                        <div className="flex justify-between items-start pb-3 border-b">
-                                            <div className="flex-1">
-                                                <p className="font-semibold text-base">{order.itemName}</p>
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Quantity: <span className="font-medium">{order.quantity}</span> × ₱{order.price.toFixed(2)}
-                                                </p>
-                                            </div>
-                                            <p className="font-semibold text-base">₱{(order.price * order.quantity).toFixed(2)}</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-sm">
-                                                <p className="text-muted-foreground">Subtotal</p>
-                                                <p className="font-medium">₱{(order.price * order.quantity).toFixed(2)}</p>
-                                            </div>
-                                            <div className="flex justify-between text-sm">
-                                                <p className="text-muted-foreground">Shipping Fee</p>
-                                                <p className="font-medium">₱{order.shippingFee.toFixed(2)}</p>
-                                            </div>
-                                            <Separator className="my-2" />
-                                            <div className="flex justify-between font-bold text-lg">
-                                                <p>Total Amount</p>
-                                                <p className="text-primary">₱{order.totalAmount.toFixed(2)}</p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {/* Aggregated Order Items Logic */
+                                        (() => {
+                                            // 1. Try to parse/use order.items
+                                            let items: any[] = [];
+                                            try {
+                                                if (Array.isArray(order.items)) {
+                                                    items = order.items;
+                                                } else if (typeof order.items === 'string') {
+                                                    items = JSON.parse(order.items);
+                                                }
+                                            } catch (e) {
+                                                console.error("Failed to parse order items", e);
+                                                items = [];
+                                            }
+
+                                            // 2. If we have valid items, aggregate them
+                                            if (items && items.length > 0) {
+                                                const aggregatedItems: Record<string, { name: string; quantity: number; price: number; subtotal: number }> = {};
+
+                                                items.forEach((item: any) => {
+                                                    const product = item.product || {};
+                                                    const productId = product.id || product.name || item.name || "unknown";
+                                                    const productName = product.name || item.name || "Unknown Product";
+                                                    const price = product.retailPrice || item.price || 0;
+                                                    const quantity = item.quantity || 0;
+
+                                                    if (!aggregatedItems[productId]) {
+                                                        aggregatedItems[productId] = {
+                                                            name: productName,
+                                                            quantity: 0,
+                                                            price: price,
+                                                            subtotal: 0
+                                                        };
+                                                    }
+                                                    aggregatedItems[productId].quantity += quantity;
+                                                    aggregatedItems[productId].subtotal += (quantity * price);
+                                                });
+
+                                                return (
+                                                    <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                                                        {Object.values(aggregatedItems).map((item, idx) => (
+                                                            <div key={idx} className="flex justify-between items-start pb-3 border-b last:border-0 last:pb-0">
+                                                                <div className="flex-1">
+                                                                    <p className="font-semibold text-base">{item.name}</p>
+                                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                                        Quantity: <span className="font-medium">{item.quantity}</span> × ₱{item.price.toFixed(2)}
+                                                                    </p>
+                                                                </div>
+                                                                <p className="font-semibold text-base">₱{item.subtotal.toFixed(2)}</p>
+                                                            </div>
+                                                        ))}
+                                                        <Separator className="my-2" />
+                                                        <div className="space-y-2 pt-2">
+                                                            <div className="flex justify-between text-sm">
+                                                                <p className="text-muted-foreground">Subtotal (All Items)</p>
+                                                                <p className="font-medium">₱{(order.price * order.quantity).toFixed(2)}</p>
+                                                            </div>
+                                                            <div className="flex justify-between text-sm">
+                                                                <p className="text-muted-foreground">Shipping Fee</p>
+                                                                <p className="font-medium">₱{order.shippingFee.toFixed(2)}</p>
+                                                            </div>
+                                                            <Separator className="my-2" />
+                                                            <div className="flex justify-between font-bold text-lg">
+                                                                <p>Total Amount</p>
+                                                                <p className="text-primary">₱{order.totalAmount.toFixed(2)}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
+                                            // Fallback for legacy orders without items array
+                                            return (
+                                                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                                                    <div className="flex justify-between items-start pb-3 border-b">
+                                                        <div className="flex-1">
+                                                            <p className="font-semibold text-base">{order.itemName}</p>
+                                                            <p className="text-sm text-muted-foreground mt-1">
+                                                                Quantity: <span className="font-medium">{order.quantity}</span> × ₱{order.price.toFixed(2)}
+                                                            </p>
+                                                        </div>
+                                                        <p className="font-semibold text-base">₱{(order.price * order.quantity).toFixed(2)}</p>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between text-sm">
+                                                            <p className="text-muted-foreground">Subtotal</p>
+                                                            <p className="font-medium">₱{(order.price * order.quantity).toFixed(2)}</p>
+                                                        </div>
+                                                        <div className="flex justify-between text-sm">
+                                                            <p className="text-muted-foreground">Shipping Fee</p>
+                                                            <p className="font-medium">₱{order.shippingFee.toFixed(2)}</p>
+                                                        </div>
+                                                        <Separator className="my-2" />
+                                                        <div className="flex justify-between font-bold text-lg">
+                                                            <p>Total Amount</p>
+                                                            <p className="text-primary">₱{order.totalAmount.toFixed(2)}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                 </div>
                             </CardContent>
                         </Card>

@@ -87,16 +87,23 @@ export default function SalesPage() {
   }, [filteredOrders]);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 p-2">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Sales</h1>
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent w-fit pb-1">
+            Sales
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Overview of your sales performance and metrics.
+          </p>
+        </div>
         <div className="flex items-center gap-4">
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" />
             Print Report
           </Button>
           <Link href="/sales/batches">
-            <Button>
+            <Button className="bg-pink-600 hover:bg-pink-700 text-white">
               View Batch Analytics
             </Button>
           </Link>
@@ -117,7 +124,7 @@ export default function SalesPage() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -129,7 +136,7 @@ export default function SalesPage() {
                 <p className="text-xs text-muted-foreground">For this {timeframe}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
                 <Package className="h-4 w-4 text-muted-foreground" />
@@ -139,7 +146,7 @@ export default function SalesPage() {
                 <p className="text-xs text-muted-foreground">Paid orders for this {timeframe}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Average Order Value</CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -149,7 +156,7 @@ export default function SalesPage() {
                 <p className="text-xs text-muted-foreground">Per order for this {timeframe}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Top Product</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
@@ -166,7 +173,7 @@ export default function SalesPage() {
           </div>
 
           <div className="grid gap-8 md:grid-cols-2">
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
               <CardHeader>
                 <CardTitle>Top Selling Products</CardTitle>
               </CardHeader>
@@ -201,7 +208,7 @@ export default function SalesPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
               <CardHeader>
                 <CardTitle>Sales by Payment Method</CardTitle>
               </CardHeader>

@@ -348,9 +348,11 @@ export default function OrderTable({ orders, customers, products, stations, batc
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={shippingStatusStyles[order.shippingStatus]}>
-                      {order.shippingStatus}
-                    </Badge>
+                    {order.customerName.toLowerCase() !== "walk in customer" && (
+                      <Badge variant="outline" className={shippingStatusStyles[order.shippingStatus]}>
+                        {order.shippingStatus}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">₱{order.totalAmount.toFixed(2)}</TableCell>
                   <TableCell>

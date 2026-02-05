@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-// import { auth } from "@/lib/auth"; // REMOVED
 import { getCurrentUser } from "@/lib/auth-server";
 
 export interface PreOrderItem {
-    productId: string;
+    productId?: string;
     productName: string;
     quantity: number;
     pricePerUnit: number;
+    images?: string[];
 }
 
 export interface CreatePreOrderData {
@@ -35,12 +35,6 @@ export async function getPreOrders() {
             throw new Error("Unauthorized");
         }
 
-        /* 
-        getCurrentUser returns the user object directly, so we don't need to fetch it again 
-        unless we need fields not returned by getCurrentUser. 
-        However, getCurrentUser returns role_rel and branch, but here we check typical role name.
-        */
-
         const isSuperAdmin = user.role?.name === "Super Admin";
 
         const preOrders = await prisma.preOrder.findMany({
@@ -54,13 +48,8 @@ export async function getPreOrders() {
                 },
             include: {
                 customer: true,
-                items: {
-                    include: {
-                        product: true,
-                    },
-                },
+                items: true,
                 batch: true,
-
             },
             orderBy: {
                 createdAt: "desc",
@@ -90,13 +79,7 @@ export async function getPreOrders() {
                 orderHistory: [],
                 totalSpent: 0,
             } : undefined,
-            items: (order as any).items.map((item: any) => ({
-                ...item,
-                product: item.product ? {
-                    ...item.product,
-                    images: item.product.images as string[] | null
-                } : undefined
-            })),
+            items: order.items,
             batchId: order.batchId,
             batch: (order as any).batch
         }));
@@ -152,17 +135,18 @@ export async function createPreOrder(data: CreatePreOrderData) {
             }
 
             // Create pre-order items
-            const itemsData = data.items.map((item) => ({
+            // Create pre-order items
+            const finalItemsData = data.items.map((item) => ({
                 preOrderId: newPreOrder.id,
-                preOrderProductId: item.productId,
                 productName: item.productName,
                 quantity: item.quantity,
                 pricePerUnit: item.pricePerUnit,
                 totalPrice: item.quantity * item.pricePerUnit,
+                images: item.images // Prisma handles Json type automatically
             }));
 
             await tx.preOrderItem.createMany({
-                data: itemsData,
+                data: finalItemsData,
             });
 
             return newPreOrder;
@@ -331,79 +315,34 @@ export async function deletePreOrder(id: string) {
     }
 }
 
-
-
-export interface CreatePreOrderProductData {
-    name: string;
-    sku: string;
-    description?: string;
-    quantity: number;
-    alertStock: number;
-    cost: number;
-    retailPrice: number;
-    images: string[];
-    inventoryProductId?: string;
-}
-
-export async function createPreOrderProduct(data: CreatePreOrderProductData) {
+// [NEW] Action to support Inventory Page list
+export async function getPreOrderItems() {
     try {
         const user = await getCurrentUser();
         if (!user) {
             throw new Error("Unauthorized");
         }
 
-        // Check if SKU already exists
-        const existingProduct = await prisma.preOrderProduct.findUnique({
-            where: { sku: data.sku },
-        });
-
-        if (existingProduct) {
-            throw new Error("A product with this SKU already exists");
-        }
-
-        const product = await prisma.preOrderProduct.create({
-            data: {
-                name: data.name,
-                sku: data.sku,
-                description: data.description,
-                quantity: data.quantity,
-                alertStock: data.alertStock,
-                cost: data.cost,
-                retailPrice: data.retailPrice,
-                images: data.images,
-                // @ts-ignore - Prisma client needs regeneration
-                inventoryProductId: data.inventoryProductId,
+        const items = await prisma.preOrderItem.findMany({
+            include: {
+                preOrder: {
+                    select: {
+                        customerName: true,
+                        batch: {
+                            select: { batchName: true }
+                        }
+                    }
+                }
             },
-        });
-
-        revalidatePath("/pre-orders");
-        return product;
-    } catch (error) {
-        console.error("Failed to create pre-order product:", error);
-        throw new Error(error instanceof Error ? error.message : "Failed to create pre-order product");
-    }
-}
-
-export async function getPreOrderProducts() {
-    try {
-        const user = await getCurrentUser();
-        if (!user) {
-            throw new Error("Unauthorized");
-        }
-
-        const products = await prisma.preOrderProduct.findMany({
             orderBy: {
-                createdAt: "desc",
-            },
+                createdAt: "desc"
+            }
         });
 
-        return products.map(p => ({
-            ...p,
-            images: p.images as string[] | null
-        }));
+        return items;
     } catch (error) {
-        console.error("Failed to fetch pre-order products:", error);
-        throw new Error("Failed to fetch pre-order products");
+        console.error("Failed to fetch pre-order items:", error);
+        throw new Error("Failed to fetch pre-order items");
     }
 }
 

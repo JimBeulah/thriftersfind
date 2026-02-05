@@ -45,8 +45,8 @@ export function MessengerNav({ currentUser }: MessengerNavProps) {
         // Initial fetch
         fetchUsersAndCounts();
 
-        // Optional: Poll for new messages every 30 seconds
-        const interval = setInterval(fetchUsersAndCounts, 30000);
+        // Poll for new messages every 3 seconds for pseudo-realtime
+        const interval = setInterval(fetchUsersAndCounts, 3000);
         return () => clearInterval(interval);
     }, []);
 

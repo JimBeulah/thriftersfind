@@ -23,7 +23,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AddWarehouseDialog } from "./add-warehouse-dialog";
 import { ViewWarehouseDialog } from "./view-warehouse-dialog";
 import { EditWarehouseDialog } from "./edit-warehouse-dialog";
-import type { WarehouseProduct } from "../actions";
+import type { WarehouseProduct } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { deleteWarehouseProduct } from "../actions";
 import {
@@ -108,7 +108,7 @@ export default function WarehouseProductsTable({ products: initialProducts }: { 
 
     return (
         <>
-            <Card>
+            <Card className="border-t-4 border-t-pink-500/50 shadow-sm">
                 <div className="flex items-center justify-between gap-2 p-4 flex-wrap">
                     <div className="flex items-center gap-2 flex-wrap">
                         <div className="relative">
@@ -128,23 +128,23 @@ export default function WarehouseProductsTable({ products: initialProducts }: { 
                             </Button>
                         )}
                     </div>
-                    <Button onClick={() => setAddDialogOpen(true)}>
+                    <Button onClick={() => setAddDialogOpen(true)} className="bg-pink-600 hover:bg-pink-700 text-white">
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Add Product
                     </Button>
                 </div>
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-muted/30">
                             <TableRow>
-                                <TableHead className="w-[80px]">Image</TableHead>
-                                <TableHead>Product Name</TableHead>
-                                <TableHead>SKU</TableHead>
-                                <TableHead>Manufacture Date</TableHead>
-                                <TableHead>Location</TableHead>
-                                <TableHead>Quantity</TableHead>
-                                <TableHead>Cost</TableHead>
-                                <TableHead>Retail Price</TableHead>
+                                <TableHead className="w-[80px] font-semibold">Image</TableHead>
+                                <TableHead className="font-semibold">Product Name</TableHead>
+                                <TableHead className="font-semibold">SKU</TableHead>
+                                <TableHead className="font-semibold">Manufacture Date</TableHead>
+                                <TableHead className="font-semibold">Location</TableHead>
+                                <TableHead className="font-semibold">Quantity</TableHead>
+                                <TableHead className="font-semibold">Cost</TableHead>
+                                <TableHead className="font-semibold">Retail Price</TableHead>
                                 <TableHead>
                                     <span className="sr-only">Actions</span>
                                 </TableHead>
@@ -152,7 +152,7 @@ export default function WarehouseProductsTable({ products: initialProducts }: { 
                         </TableHeader>
                         <TableBody>
                             {paginatedProducts.map((product) => (
-                                <TableRow key={product.id}>
+                                <TableRow key={product.id} className="hover:bg-muted/50 transition-colors">
                                     <TableCell>
                                         <div className="h-10 w-10 overflow-hidden rounded-md border bg-muted">
                                             {product.image ? (
